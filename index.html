@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%2307c160'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle' fill='white'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/uuid@9.0.0/dist/umd/uuid.min.js"></script>
 <style>
   :root {
     --bg: #1e1e1e; --panel: #2d2d30; --text: #ccc; --accent: #07c160;
@@ -75,19 +76,18 @@
   .search-bar { display:flex; gap:8px; padding:8px 20px; background:var(--panel); align-items:center; }
   .search-bar input { flex:1; padding:6px 12px; border-radius:20px; border:1px solid var(--border); background:#3c3c3c; color:var(--text); }
   .search-bar button { background:var(--accent); border:none; color:#fff; border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:14px; }
-  #profileModal, #privateChatModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:200; }
+  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:200; }
   .modal-content { background:var(--panel); padding:30px; border-radius:16px; width:400px; max-height:500px; display:flex; flex-direction:column; color:var(--text); }
 </style>
 </head>
 <body>
-
-<!-- 打字机欢迎页 -->
+<!-- 欢迎页 -->
 <div id="welcomePage">
   <div class="typewriter" id="typewriter"></div>
   <div class="welcome-emoji" id="welcomeEmoji"></div>
   <div class="welcome-btns">
-    <button class="btn-continue" onclick="showSignatureSetup()">继续</button>
-    <button class="btn-skip" onclick="skipToAuth()">跳过</button>
+    <button class="btn-continue" onclick="handleContinue()">继续</button>
+    <button class="btn-skip" onclick="handleSkip()">跳过</button>
   </div>
 </div>
 
@@ -112,10 +112,12 @@
   </div>
 </div>
 
+<!-- 聊天主界面 -->
 <div id="chatApp">
   <div class="top-bar">
     <span>✦ 星迹</span>
     <div style="display:flex; align-items:center; gap:8px;">
+      <img id="myAvatarImg" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);cursor:pointer;" onclick="uploadAvatar()" title="更换头像" />
       <button id="soundToggle" onclick="toggleSound()" style="background:#555; border:none; color:#fff; padding:4px 10px; border-radius:4px;">🔔</button>
       <button onclick="toggleTheme()" style="background:#555; border:none; color:#fff; padding:4px 10px; border-radius:4px;">主题</button>
       <button onclick="logout()" style="background:#555; border:none; color:#fff; padding:6px 14px; border-radius:6px; cursor:pointer;">退出</button>
@@ -148,7 +150,7 @@
   </div>
 </div>
 
-<!-- 视频 -->
+<!-- 视频通话弹窗 -->
 <div id="videoCallModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:300; display:none; flex-direction:column; align-items:center; justify-content:center;">
   <video id="localVideo" autoplay muted style="width:80%; max-width:400px; background:#000; border-radius:12px; margin:10px;"></video>
   <video id="remoteVideo" autoplay style="width:80%; max-width:400px; background:#000; border-radius:12px; margin:10px;"></video>
@@ -156,12 +158,11 @@
 </div>
 
 <!-- 个人主页弹窗 -->
-<div id="profileModal"><div class="modal-content" id="profileContent"></div></div>
+<div id="profileModal" class="modal"><div class="modal-content" id="profileContent"></div></div>
 
 <!-- 私聊弹窗 -->
-<div id="privateChatModal"><div class="modal-content" id="privateChatContent"></div></div>
+<div id="privateChatModal" class="modal"><div class="modal-content" id="privateChatContent"></div></div>
 
-<script src="https://cdn.jsdelivr.net/npm/uuid@9.0.0/dist/umd/uuid.min.js"></script>
 <script>
   const SUPABASE_URL = 'https://nzgnqwcsgnqjffydnxtz.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_igxAfIfC7M4n6SYJKkqQRA_Cj2V0ba9';
@@ -173,35 +174,62 @@
   let soundEnabled = true;
   const emojis = ['😀','😂','😍','😢','😡','👍','👎','🎉','✨','🔥','❤️','💔','😭','🤔','😎','😴','😇','🤣','😱','🥰','🤩','😜','😤','🥺','🧐'];
   let wsChannels = [];
+  const welcomeEmojiList = ['👏','🎉','🥳','🤗','🎊','✨'];
 
   // ========== 欢迎打字机 ==========
-  function typeWriter(text, i, cb) {
-    if (i < text.length) {
-      document.getElementById('typewriter').textContent += text.charAt(i);
-      setTimeout(() => typeWriter(text, i+1, cb), 80);
-    } else if (cb) cb();
-  }
   function showWelcome() {
-    const emojiList = ['👏','🎉','🥳','🤗','🎊','✨'];
-    document.getElementById('welcomeEmoji').textContent = emojiList[Math.floor(Math.random()*emojiList.length)];
-    typeWriter('欢迎来到 StarryChat', 0);
+    document.getElementById('welcomePage').style.display = 'flex';
+    document.getElementById('authPage').style.display = 'none';
+    document.getElementById('chatApp').style.display = 'none';
+    document.getElementById('welcomeEmoji').textContent = welcomeEmojiList[Math.floor(Math.random() * welcomeEmojiList.length)];
+    const tw = document.getElementById('typewriter');
+    tw.textContent = '';
+    const text = '欢迎来到 StarryChat';
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < text.length) {
+        tw.textContent += text.charAt(i);
+        i++;
+      } else {
+        clearInterval(interval);
+        tw.style.borderRight = 'none';
+      }
+    }, 100);
   }
-  function showSignatureSetup() {
-    const sig = prompt('设置你的个性签名（让朋友们更了解你）：');
-    if (sig && currentUser.username) {
-      db.from('users').update({ signature: sig }).eq('username', currentUser.username).then(() => {
-        alert('个性签名已保存！');
-        document.getElementById('welcomePage').style.display='none';
-        document.getElementById('chatApp').style.display='flex';
-      });
+
+  function handleContinue() {
+    // 如果已经登录，直接进聊天室并设置签名
+    if (currentUser && currentUser.username) {
+      const sig = prompt('设置你的个性签名（让朋友们更了解你）：', '');
+      if (sig !== null) {
+        db.from('users').update({ signature: sig }).eq('username', currentUser.username).then(() => {
+          alert('签名已保存！');
+        });
+      }
+      enterChat();
     } else {
-      document.getElementById('welcomePage').style.display='none';
-      document.getElementById('authPage').style.display='flex';
+      // 未登录，跳转到登录页
+      document.getElementById('welcomePage').style.display = 'none';
+      document.getElementById('authPage').style.display = 'flex';
     }
   }
-  function skipToAuth() {
-    document.getElementById('welcomePage').style.display='none';
-    document.getElementById('authPage').style.display='flex';
+
+  function handleSkip() {
+    // 直接去登录/注册
+    document.getElementById('welcomePage').style.display = 'none';
+    document.getElementById('authPage').style.display = 'flex';
+  }
+
+  function enterChat() {
+    document.getElementById('welcomePage').style.display = 'none';
+    document.getElementById('authPage').style.display = 'none';
+    document.getElementById('chatApp').style.display = 'flex';
+    updateAvatarDisplay();
+    loadRooms();
+    loadMessages('大厅');
+    subscribeToMessages();
+    subscribePrivateMessages();
+    subscribeCalls();
   }
 
   // ========== 声音 ==========
@@ -211,7 +239,7 @@
   // ========== 加密 ==========
   function sha256(str) { return CryptoJS.SHA256(str).toString(); }
 
-  // ========== 登录/注册（含记住我） ==========
+  // ========== 登录/注册 ==========
   function showRegister() { document.getElementById("loginBox").style.display="none"; document.getElementById("regBox").style.display="block"; }
   function showLogin() { document.getElementById("regBox").style.display="none"; document.getElementById("loginBox").style.display="block"; }
 
@@ -221,9 +249,9 @@
     const remember = document.getElementById("rememberMe").checked;
     if (!u||!p) return;
     const hash = sha256(p);
-    const { data, error } = await db.from('users').select('username, avatar').eq('username', u).eq('password_hash', hash).single();
+    const { data, error } = await db.from('users').select('*').eq('username', u).eq('password_hash', hash).single();
     if (error||!data) { document.getElementById("loginError").innerText="用户名或密码错误"; return; }
-    currentUser = { username: data.username, avatar: data.avatar||'' };
+    currentUser = { username: data.username, avatar: data.avatar || '' };
     if (remember) {
       const token = uuid.v4();
       const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
@@ -232,9 +260,7 @@
     } else {
       localStorage.removeItem('starry_remember');
     }
-    document.getElementById("authPage").style.display="none";
-    document.getElementById("chatApp").style.display="flex";
-    loadRooms(); loadMessages('大厅'); subscribeToMessages(); subscribePrivateMessages(); subscribeCalls();
+    enterChat();
   }
 
   async function register() {
@@ -244,42 +270,63 @@
     const hash = sha256(p);
     const { data: existing } = await db.from('users').select('username').eq('username', u).single();
     if (existing) { document.getElementById("regError").innerText="用户名已存在"; return; }
-    await db.from('users').insert({ username: u, password_hash: hash, avatar: '', signature: '' });
+    const { error } = await db.from('users').insert({ username: u, password_hash: hash, avatar: '', signature: '' });
+    if (error) { document.getElementById("regError").innerText="注册失败："+error.message; return; }
     alert("注册成功！请登录"); showLogin();
   }
 
   async function autoLogin() {
     const savedToken = localStorage.getItem('starry_remember');
-    if (savedToken) {
-      const { data, error } = await db.from('users').select('username, avatar, remember_expires').eq('remember_token', savedToken).single();
-      if (data && !error && new Date(data.remember_expires) > new Date()) {
-        currentUser = { username: data.username, avatar: data.avatar||'' };
-        document.getElementById("welcomePage").style.display="none";
-        document.getElementById("authPage").style.display="none";
-        document.getElementById("chatApp").style.display="flex";
-        loadRooms(); loadMessages('大厅'); subscribeToMessages(); subscribePrivateMessages(); subscribeCalls();
-        return;
-      } else {
-        localStorage.removeItem('starry_remember');
-      }
+    if (!savedToken) {
+      showWelcome();
+      return;
     }
-    // 没有有效 token，展示欢迎页
-    document.getElementById("welcomePage").style.display="flex";
-    document.getElementById("authPage").style.display="none";
-    document.getElementById("chatApp").style.display="none";
+    const { data, error } = await db.from('users').select('username, avatar, remember_expires').eq('remember_token', savedToken).single();
+    if (data && !error && new Date(data.remember_expires) > new Date()) {
+      currentUser = { username: data.username, avatar: data.avatar || '' };
+      enterChat();
+    } else {
+      localStorage.removeItem('starry_remember');
+      showWelcome();
+    }
   }
 
   function logout() {
-    currentUser = { username: '' };
+    currentUser = { username: '', avatar: '' };
     localStorage.removeItem('starry_remember');
-    document.getElementById("welcomePage").style.display="none";
-    document.getElementById("authPage").style.display="flex";
-    document.getElementById("chatApp").style.display="none";
-    wsChannels.forEach(ch => db.removeChannel(ch)); wsChannels=[];
+    document.getElementById('chatApp').style.display = 'none';
+    wsChannels.forEach(ch => db.removeChannel(ch));
+    wsChannels = [];
+    showWelcome();
   }
 
   // ========== 主题 ==========
   function toggleTheme() { document.body.classList.toggle('light'); }
+
+  // ========== 头像更新 ==========
+  function updateAvatarDisplay() {
+    const img = document.getElementById('myAvatarImg');
+    if (img) img.src = currentUser.avatar || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234ec9b0'/%3E%3Ctext x='50' y='70' font-size='50' text-anchor='middle' fill='white'%3E" + (currentUser.username?.[0] || '?') + "%3C/text%3E%3C/svg%3E";
+  }
+
+  async function uploadAvatar() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        currentUser.avatar = ev.target.result;
+        await db.from('users').update({ avatar: currentUser.avatar }).eq('username', currentUser.username);
+        updateAvatarDisplay();
+        alert('头像已更新！');
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
 
   // ========== 房间 ==========
   function loadRooms() { document.getElementById('roomList').innerHTML='<div class="room-item active" onclick="switchRoom(\'大厅\')">🏠 大厅</div>'; }
@@ -303,35 +350,157 @@
   // ========== 文件 ==========
   document.getElementById("fileInput").addEventListener("change",async(e)=>{ const file=e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=async(ev)=>{ const base64=ev.target.result; await db.from('messages').insert({room:currentRoom,username:currentUser.username,content:base64,type:file.type.startsWith('image/')?'image':'file',avatar:currentUser.avatar||''}); }; reader.readAsDataURL(file); e.target.value=''; });
 
-  // ========== 头像上传 ==========
-  function uploadAvatar() { const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.onchange=async(e)=>{ const file=e.target.files[0]; const reader=new FileReader(); reader.onload=async(ev)=>{ currentUser.avatar=ev.target.result; await db.from('users').update({avatar:currentUser.avatar}).eq('username',currentUser.username); alert('头像已更新！刷新页面生效'); }; reader.readAsDataURL(file); }; input.click(); }
-
   // ========== 个人主页 ==========
-  async function showProfile(username) { const {data}=await db.from('users').select('avatar,signature').eq('username',username).single(); if(data){ document.getElementById('profileContent').innerHTML=`<h3>${username} 的主页</h3><img src="${data.avatar||''}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;"/><p style="margin-top:10px;">${data.signature||'这个人很懒，什么都没写~'}</p><button onclick="document.getElementById(\'profileModal\').style.display=\'none\'">关闭</button>`; document.getElementById('profileModal').style.display='flex'; } }
+  async function showProfile(username) {
+    const { data } = await db.from('users').select('avatar, signature').eq('username', username).single();
+    const avatar = data?.avatar || '';
+    const signature = data?.signature || '这个人很懒，什么都没写~';
+    document.getElementById('profileContent').innerHTML = `
+      <h3>${username} 的主页</h3>
+      <img src="${avatar}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:10px 0;" />
+      <p style="margin:10px 0;">${signature}</p>
+      <button onclick="document.getElementById('profileModal').style.display='none'">关闭</button>
+    `;
+    document.getElementById('profileModal').style.display = 'flex';
+  }
 
   // ========== 私聊 ==========
-  let privateTarget=''; function openPrivateChat(target){ wsChannels=wsChannels.filter(ch=>{ if(ch.topic==='realtime:public:private_messages'){ db.removeChannel(ch); return false; } return true; }); privateTarget=target; document.getElementById("privateChatContent").innerHTML=`<h3>私聊 ${target}</h3><div id="privateChatMessages" style="flex:1;overflow-y:auto;padding:10px;margin:10px 0;border-radius:8px;background:var(--bg);max-height:300px;"></div><div style="display:flex;gap:10px;"><input type="text" id="privateChatInput" placeholder="输入私聊消息..." style="flex:1;padding:10px;border-radius:20px;border:1px solid var(--border);background:#3c3c3c;color:var(--text);"/><button onclick="sendPrivateMessage()" style="background:var(--accent);border:none;color:#fff;border-radius:50%;width:40px;height:40px;font-size:1.2rem;cursor:pointer;">➤</button></div><button onclick="document.getElementById(\'privateChatModal\').style.display=\'none\'" style="margin-top:10px;background:#555;border:none;color:#fff;padding:8px;border-radius:8px;cursor:pointer;">关闭</button>`; document.getElementById('privateChatModal').style.display='flex'; loadPrivateMessages(target); subscribePrivateMessages(); }
-  async function loadPrivateMessages(target){ const {data}=await db.from('private_messages').select('*').or(`sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`).order('created_at',{ascending:true}); if(data){ const box=document.getElementById("privateChatMessages"); if(box){ box.innerHTML=''; data.filter(m=>(m.sender===currentUser.username&&m.receiver===target)||(m.sender===target&&m.receiver===currentUser.username)).forEach(m=>appendPrivateMessage(m,m.sender===currentUser.username)); } } }
-  function subscribePrivateMessages(){ const ch=db.channel('public:private_messages').on('postgres_changes',{event:'INSERT',schema:'public',table:'private_messages'},payload=>{ const msg=payload.new; if((msg.sender===currentUser.username&&msg.receiver===privateTarget)||(msg.sender===privateTarget&&msg.receiver===currentUser.username)){ appendPrivateMessage(msg,msg.sender===currentUser.username); } }).subscribe(); wsChannels.push(ch); }
-  async function sendPrivateMessage(){ const input=document.getElementById("privateChatInput"); const text=input.value.trim(); if(!text||!privateTarget) return; await db.from('private_messages').insert({sender:currentUser.username,receiver:privateTarget,content:text}); input.value=''; }
-  function appendPrivateMessage(msg,isSelf){ const div=document.createElement('div'); div.className='msg '+(isSelf?'self':'other'); div.style.background=isSelf?'#95ec69':'var(--other-msg)'; div.style.color=isSelf?'#000':'var(--text)'; div.style.alignSelf=isSelf?'flex-end':'flex-start'; div.innerHTML=`<div class="msg-content">${isSelf?'':`<div style="font-size:0.75rem;color:var(--text);opacity:0.7;">${msg.sender}</div>`}<div>${msg.content}</div></div>`; const box=document.getElementById("privateChatMessages"); if(box) box.appendChild(div); }
+  let privateTarget = '';
+  function openPrivateChat(target) {
+    wsChannels = wsChannels.filter(ch => { if (ch.topic === 'realtime:public:private_messages') { db.removeChannel(ch); return false; } return true; });
+    privateTarget = target;
+    document.getElementById('privateChatContent').innerHTML = `
+      <h3>私聊 ${target}</h3>
+      <div id="privateChatMessages" style="flex:1;overflow-y:auto;padding:10px;margin:10px 0;border-radius:8px;background:var(--bg);max-height:300px;"></div>
+      <div style="display:flex;gap:10px;">
+        <input type="text" id="privateChatInput" placeholder="输入私聊消息..." style="flex:1;padding:10px;border-radius:20px;border:1px solid var(--border);background:#3c3c3c;color:var(--text);" />
+        <button onclick="sendPrivateMessage()" style="background:var(--accent);border:none;color:#fff;border-radius:50%;width:40px;height:40px;font-size:1.2rem;cursor:pointer;">➤</button>
+      </div>
+      <button onclick="document.getElementById('privateChatModal').style.display='none'" style="margin-top:10px;background:#555;border:none;color:#fff;padding:8px;border-radius:8px;cursor:pointer;">关闭</button>
+    `;
+    document.getElementById('privateChatModal').style.display = 'flex';
+    loadPrivateMessages(target);
+    subscribePrivateMessages();
+  }
 
-  document.getElementById("memberList").addEventListener("dblclick",(e)=>{ const target=e.target.textContent.trim().replace("👤 ",""); if(target&&target!==currentUser.username) openPrivateChat(target); });
+  async function loadPrivateMessages(target) {
+    const { data } = await db.from('private_messages').select('*').or(`sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`).order('created_at', { ascending: true });
+    const box = document.getElementById('privateChatMessages');
+    if (!box) return;
+    box.innerHTML = '';
+    data?.filter(m => (m.sender === currentUser.username && m.receiver === target) || (m.sender === target && m.receiver === currentUser.username))
+      .forEach(m => appendPrivateMessage(m, m.sender === currentUser.username));
+  }
 
-  // ========== AI ==========
-  async function askAI(prompt,context){ const fullMsg=`你是星迹聊天室里的智能助手。请用简洁、友好的中文回答。\n聊天记录：${context}\n用户：${prompt}`; const url='https://text.pollinations.ai/'+encodeURIComponent(fullMsg)+'?model=openai'; try{ const res=await fetch(url); const text=await res.text(); return text||'（AI 暂时无回复）'; } catch(e){ return 'AI 暂时无法回复，请稍后再试。'; } }
-  const originalSendMessage=sendMessage; sendMessage=function(){ const input=document.getElementById("messageInput"); const text=input.value.trim(); if(text.startsWith('@ai ')){ const prompt=text.slice(4); const context=''; input.value=''; renderMessage({username:currentUser.username,content:'@ai '+prompt,type:'text',avatar:currentUser.avatar,created_at:new Date()}); askAI(prompt,context).then(reply=>{ renderMessage({username:'AI助手',content:reply,type:'text',avatar:'',created_at:new Date()}); }); return; } originalSendMessage(); };
+  function subscribePrivateMessages() {
+    const ch = db.channel('public:private_messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, payload => {
+      const msg = payload.new;
+      if ((msg.sender === currentUser.username && msg.receiver === privateTarget) || (msg.sender === privateTarget && msg.receiver === currentUser.username)) {
+        appendPrivateMessage(msg, msg.sender === currentUser.username);
+      }
+    }).subscribe();
+    wsChannels.push(ch);
+  }
+
+  async function sendPrivateMessage() {
+    const input = document.getElementById('privateChatInput');
+    const text = input?.value.trim();
+    if (!text || !privateTarget) return;
+    await db.from('private_messages').insert({ sender: currentUser.username, receiver: privateTarget, content: text });
+    input.value = '';
+  }
+
+  function appendPrivateMessage(msg, isSelf) {
+    const box = document.getElementById('privateChatMessages');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = 'msg ' + (isSelf ? 'self' : 'other');
+    div.style.background = isSelf ? '#95ec69' : 'var(--other-msg)';
+    div.style.color = isSelf ? '#000' : 'var(--text)';
+    div.style.alignSelf = isSelf ? 'flex-end' : 'flex-start';
+    div.innerHTML = `<div class="msg-content">${isSelf ? '' : `<div style="font-size:0.75rem;color:var(--text);opacity:0.7;">${msg.sender}</div>`}<div>${msg.content}</div></div>`;
+    box.appendChild(div);
+  }
+
+  document.getElementById('memberList').addEventListener('dblclick', (e) => {
+    const target = e.target.textContent.trim().replace('👤 ', '');
+    if (target && target !== currentUser.username) openPrivateChat(target);
+  });
+
+  // ========== AI 助手 ==========
+  async function askAI(prompt, context) {
+    const fullMsg = `你是星迹聊天室里的智能助手。请用简洁、友好的中文回答。\n聊天记录：${context}\n用户：${prompt}`;
+    const url = 'https://text.pollinations.ai/' + encodeURIComponent(fullMsg) + '?model=openai';
+    try { const res = await fetch(url); const text = await res.text(); return text || '（AI 暂时无回复）'; } catch (e) { return 'AI 暂时无法回复，请稍后再试。'; }
+  }
+  const origSend = sendMessage;
+  sendMessage = function() {
+    const input = document.getElementById("messageInput");
+    const text = input.value.trim();
+    if (text.startsWith('@ai ')) {
+      const prompt = text.slice(4);
+      const context = '';
+      input.value = '';
+      renderMessage({ username: currentUser.username, content: '@ai ' + prompt, type: 'text', avatar: currentUser.avatar, created_at: new Date() });
+      askAI(prompt, context).then(reply => {
+        renderMessage({ username: 'AI助手', content: reply, type: 'text', avatar: '', created_at: new Date() });
+      });
+      return;
+    }
+    origSend();
+  };
 
   // ========== WebRTC ==========
-  let localStream,pc,callTarget; async function startCall(){ const target=prompt('请输入对方用户名：'); if(!target) return; callTarget=target; localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:true}); document.getElementById('localVideo').srcObject=localStream; document.getElementById('videoCallModal').style.display='flex'; pc=new RTCPeerConnection(); localStream.getTracks().forEach(track=>pc.addTrack(track,localStream)); pc.ontrack=(e)=>{ document.getElementById('remoteVideo').srcObject=e.streams[0]; }; pc.onicecandidate=(e)=>{ if(e.candidate) db.from('calls').insert({sender:currentUser.username,receiver:target,type:'ice',data:e.candidate}); }; const offer=await pc.createOffer(); await pc.setLocalDescription(offer); db.from('calls').insert({sender:currentUser.username,receiver:target,type:'offer',data:offer}); }
-  function subscribeCalls(){ const ch=db.channel('public:calls').on('postgres_changes',{event:'INSERT',schema:'public',table:'calls'},async payload=>{ const msg=payload.new; if(msg.receiver!==currentUser.username) return; if(msg.type==='offer'){ pc=new RTCPeerConnection(); localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:true}); document.getElementById('localVideo').srcObject=localStream; localStream.getTracks().forEach(track=>pc.addTrack(track,localStream)); pc.ontrack=(e)=>{ document.getElementById('remoteVideo').srcObject=e.streams[0]; }; pc.onicecandidate=(e)=>{ if(e.candidate) db.from('calls').insert({sender:currentUser.username,receiver:msg.sender,type:'ice',data:e.candidate}); }; await pc.setRemoteDescription(new RTCSessionDescription(msg.data)); const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); db.from('calls').insert({sender:currentUser.username,receiver:msg.sender,type:'answer',data:answer}); document.getElementById('videoCallModal').style.display='flex'; callTarget=msg.sender; } else if(msg.type==='answer'){ if(pc) await pc.setRemoteDescription(new RTCSessionDescription(msg.data)); } else if(msg.type==='ice'){ if(pc) await pc.addIceCandidate(new RTCIceCandidate(msg.data)); } }).subscribe(); wsChannels.push(ch); }
-  function hangUp(){ if(pc){pc.close();pc=null;} if(localStream){localStream.getTracks().forEach(t=>t.stop());} document.getElementById('videoCallModal').style.display='none'; if(callTarget) db.from('calls').delete().or(`sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`); }
+  let localStream, pc, callTarget;
+  async function startCall() {
+    const target = prompt('请输入对方用户名：');
+    if (!target) return;
+    callTarget = target;
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('videoCallModal').style.display = 'flex';
+    pc = new RTCPeerConnection();
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    pc.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+    pc.onicecandidate = (e) => { if (e.candidate) db.from('calls').insert({ sender: currentUser.username, receiver: target, type: 'ice', data: e.candidate }); };
+    const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+    db.from('calls').insert({ sender: currentUser.username, receiver: target, type: 'offer', data: offer });
+  }
+  function subscribeCalls() {
+    const ch = db.channel('public:calls').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls' }, async payload => {
+      const msg = payload.new;
+      if (msg.receiver !== currentUser.username) return;
+      if (msg.type === 'offer') {
+        pc = new RTCPeerConnection();
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        document.getElementById('localVideo').srcObject = localStream;
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        pc.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+        pc.onicecandidate = (e) => { if (e.candidate) db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender, type: 'ice', data: e.candidate }); };
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+        const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+        db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender, type: 'answer', data: answer });
+        document.getElementById('videoCallModal').style.display = 'flex';
+        callTarget = msg.sender;
+      } else if (msg.type === 'answer') {
+        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+      } else if (msg.type === 'ice') {
+        if (pc) await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+      }
+    }).subscribe();
+    wsChannels.push(ch);
+  }
+  function hangUp() {
+    if (pc) { pc.close(); pc = null; }
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+    document.getElementById('videoCallModal').style.display = 'none';
+    if (callTarget) db.from('calls').delete().or(`sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`);
+  }
 
-  document.getElementById("messageInput").addEventListener("keypress",(e)=>{ if(e.key==="Enter") sendMessage(); });
+  document.getElementById("messageInput").addEventListener("keypress", (e) => { if (e.key === "Enter") sendMessage(); });
 
   // ========== 初始化 ==========
   window.onload = () => {
-    showWelcome();
     autoLogin();
   };
 </script>
