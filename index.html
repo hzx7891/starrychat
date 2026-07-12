@@ -928,7 +928,7 @@
         }
 
         async function startCall() {
-            const target = prompt('📞 输入对方用户名：');
+            const target = prompt('📞 输入对方用户名!：');
             if (!target || target === currentUser.username) return;
             callTarget = target;
             try {
@@ -944,7 +944,7 @@
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
                 db.from('calls').insert({ sender: currentUser.username, receiver: target, type: 'offer', data: offer });
-            } catch (_) { alert('无法访问摄像头/麦克风，请检查权限设置。'); }
+            } catch (_) { alert('无法访问摄像头/麦克风，请检查权限设置!'); }
         }
 
         function subscribeCalls() {
