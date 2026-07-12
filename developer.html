@@ -38,9 +38,9 @@
             font-family: var(--font);
             background: var(--bg-primary);
             color: var(--text-primary);
-            display: flex;
             height: 100vh;
             overflow: hidden;
+            margin: 0;
         }
         body.light {
             --bg-primary: #f0f0f5;
@@ -60,7 +60,98 @@
             border-radius: 999px;
         }
 
-        /* ===== 侧边栏 ===== */
+        /* ===== 登录界面 ===== */
+        #loginOverlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+            backdrop-filter: blur(12px);
+        }
+        #loginOverlay .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 40px 36px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            animation: fadeIn 0.4s ease;
+        }
+        #loginOverlay .login-box h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+        #loginOverlay .login-box p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 28px;
+        }
+        #loginOverlay .login-box input {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            margin-bottom: 16px;
+            font-family: var(--font);
+        }
+        #loginOverlay .login-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+        }
+        #loginOverlay .login-box .btn-login {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font);
+        }
+        #loginOverlay .login-box .btn-login:hover {
+            transform: scale(1.02);
+            opacity: 0.9;
+        }
+        #loginOverlay .login-box .error {
+            color: #e74c3c;
+            font-size: 0.85rem;
+            margin-top: 12px;
+            min-height: 1.4rem;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* ===== 侧边栏 & 主内容（与之前一致） ===== */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
         .sidebar {
             width: 220px;
             background: var(--bg-secondary);
@@ -120,7 +211,6 @@
             color: var(--text-primary);
         }
 
-        /* ===== 主内容 ===== */
         .main {
             flex: 1;
             display: flex;
@@ -159,16 +249,6 @@
         }
         .main .content .page.active {
             display: block;
-        }
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         /* ===== 卡片 & 表格 ===== */
@@ -369,152 +449,171 @@
     </style>
 </head>
 <body>
-    <!-- ===== 侧边栏 ===== -->
-    <div class="sidebar" id="sidebar">
-        <div class="brand">✦ <span>星迹 · Dev</span></div>
-        <div class="nav-item active" data-page="dashboard">📊 <span>仪表板</span></div>
-        <div class="nav-item" data-page="messages">💬 <span>消息管理</span></div>
-        <div class="nav-item" data-page="users">👥 <span>用户管理</span></div>
-        <div class="nav-item" data-page="reports">🚩 <span>举报中心</span></div>
-        <div class="nav-item" data-page="ai">🤖 <span>AI 沙盒</span></div>
-        <div class="nav-item" data-page="broadcast">📢 <span>系统广播</span></div>
-        <div class="nav-item" data-page="logs">📋 <span>实时日志</span></div>
-        <div class="nav-item" data-page="settings">⚙️ <span>设置</span></div>
-        <div class="user-badge" id="userBadge">👤 <strong>加载中...</strong></div>
+
+    <!-- ===== 登录遮罩 ===== -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h1>✦ 星迹 · Dev</h1>
+            <p>开发者控制台 · 密码验证</p>
+            <input type="password" id="devPassword" placeholder="输入开发者密码" />
+            <button class="btn-login" onclick="attemptLogin()">🔓 进入</button>
+            <div class="error" id="loginError"></div>
+        </div>
     </div>
 
-    <!-- ===== 主界面 ===== -->
-    <div class="main">
-        <div class="header">
-            <h2 id="pageTitle">📊 仪表板</h2>
-            <div class="actions">
-                <button class="btn-sm primary" onclick="refreshAll()">🔄 刷新</button>
-                <button class="btn-sm" onclick="toggleTheme()">🌓 主题</button>
-                <button class="btn-sm danger" onclick="logoutDev()">退出</button>
-            </div>
+    <!-- ===== 主应用 ===== -->
+    <div class="app-container" id="appContainer" style="display:none;">
+        <!-- 侧边栏 -->
+        <div class="sidebar" id="sidebar">
+            <div class="brand">✦ <span>星迹 · Dev</span></div>
+            <div class="nav-item active" data-page="dashboard">📊 <span>仪表板</span></div>
+            <div class="nav-item" data-page="messages">💬 <span>消息管理</span></div>
+            <div class="nav-item" data-page="users">👥 <span>用户管理</span></div>
+            <div class="nav-item" data-page="reports">🚩 <span>举报中心</span></div>
+            <div class="nav-item" data-page="ai">🤖 <span>AI 沙盒</span></div>
+            <div class="nav-item" data-page="broadcast">📢 <span>系统广播</span></div>
+            <div class="nav-item" data-page="logs">📋 <span>实时日志</span></div>
+            <div class="nav-item" data-page="settings">⚙️ <span>设置</span></div>
+            <div class="user-badge" id="userBadge">👤 <strong>开发者</strong></div>
         </div>
-        <div class="content" id="mainContent">
 
-            <!-- ========== 仪表板 ========== -->
-            <div class="page active" id="page-dashboard">
-                <div class="stat-grid" id="statsGrid">
-                    <div class="stat-card"><div class="num" id="statMessages">0</div><div class="label">总消息数</div></div>
-                    <div class="stat-card"><div class="num" id="statUsers">0</div><div class="label">注册用户</div></div>
-                    <div class="stat-card"><div class="num" id="statRooms">0</div><div class="label">活跃房间</div></div>
-                    <div class="stat-card"><div class="num" id="statReports">0</div><div class="label">待处理举报</div></div>
+        <!-- 主内容 -->
+        <div class="main">
+            <div class="header">
+                <h2 id="pageTitle">📊 仪表板</h2>
+                <div class="actions">
+                    <button class="btn-sm primary" onclick="refreshAll()">🔄 刷新</button>
+                    <button class="btn-sm" onclick="toggleTheme()">🌓 主题</button>
+                    <button class="btn-sm danger" onclick="logoutDev()">退出</button>
                 </div>
-                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
-                    <h4>📌 开发者快捷操作</h4>
-                    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
-                        <button class="btn-sm primary" onclick="exportData()">📥 导出所有消息 (JSON)</button>
-                        <button class="btn-sm danger" onclick="if(confirm('确定清空本地缓存吗？')){localStorage.clear();alert('已清除');}">🧹 清空本地缓存</button>
+            </div>
+            <div class="content" id="mainContent">
+
+                <!-- ========== 仪表板 ========== -->
+                <div class="page active" id="page-dashboard">
+                    <div class="stat-grid" id="statsGrid">
+                        <div class="stat-card"><div class="num" id="statMessages">0</div><div class="label">总消息数</div></div>
+                        <div class="stat-card"><div class="num" id="statUsers">0</div><div class="label">注册用户</div></div>
+                        <div class="stat-card"><div class="num" id="statRooms">0</div><div class="label">活跃房间</div></div>
+                        <div class="stat-card"><div class="num" id="statReports">0</div><div class="label">待处理举报</div></div>
+                    </div>
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
+                        <h4>📌 开发者快捷操作</h4>
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
+                            <button class="btn-sm primary" onclick="exportData()">📥 导出所有消息 (JSON)</button>
+                            <button class="btn-sm danger" onclick="if(confirm('确定清空本地缓存吗？')){localStorage.clear();alert('已清除');}">🧹 清空本地缓存</button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- ========== 消息管理 ========== -->
-            <div class="page" id="page-messages">
-                <div class="input-group">
-                    <input type="text" id="msgFilterUser" placeholder="过滤用户名..." />
-                    <input type="text" id="msgFilterRoom" placeholder="过滤房间..." />
-                    <button class="btn-sm primary" onclick="loadAllMessages()">🔍 搜索</button>
-                    <button class="btn-sm" onclick="document.getElementById('msgFilterUser').value='';document.getElementById('msgFilterRoom').value='';loadAllMessages();">清除</button>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>时间</th><th>用户</th><th>房间</th><th>内容</th><th>操作</th></tr></thead>
-                        <tbody id="msgTableBody"><tr><td colspan="5" class="empty-state">加载中...</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- ========== 用户管理 ========== -->
-            <div class="page" id="page-users">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>头像</th><th>用户名</th><th>个性签名</th><th>最后活跃</th></tr></thead>
-                        <tbody id="userTableBody"><tr><td colspan="4" class="empty-state">加载中...</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- ========== 举报中心 ========== -->
-            <div class="page" id="page-reports">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>举报人</th><th>被举报用户</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
-                        <tbody id="reportTableBody"><tr><td colspan="5" class="empty-state">加载中...</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- ========== AI 沙盒 ========== -->
-            <div class="page" id="page-ai">
-                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
-                    <h4>🤖 独立 AI 对话测试</h4>
-                    <div class="input-group" style="margin-top:12px;">
-                        <textarea id="aiPrompt" placeholder="输入你的 Prompt...">用中文简要介绍星迹聊天室</textarea>
-                        <button class="btn-sm primary" onclick="testAI()">🚀 发送</button>
-                    </div>
-                    <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:16px;margin-top:12px;min-height:100px;white-space:pre-wrap;" id="aiResponse">
-                        等待响应...
-                    </div>
-                </div>
-            </div>
-
-            <!-- ========== 系统广播 ========== -->
-            <div class="page" id="page-broadcast">
-                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
-                    <h4>📢 发送系统广播</h4>
-                    <p style="color:var(--text-muted);font-size:0.85rem;margin:8px 0 12px;">将以 <strong>🛡️ 系统</strong> 身份向大厅发送公告</p>
+                <!-- ========== 消息管理 ========== -->
+                <div class="page" id="page-messages">
                     <div class="input-group">
-                        <input type="text" id="broadcastInput" placeholder="输入广播内容..." style="flex:3;" />
-                        <button class="btn-sm primary" onclick="sendBroadcast()">📨 发送</button>
+                        <input type="text" id="msgFilterUser" placeholder="过滤用户名..." />
+                        <input type="text" id="msgFilterRoom" placeholder="过滤房间..." />
+                        <button class="btn-sm primary" onclick="loadAllMessages()">🔍 搜索</button>
+                        <button class="btn-sm" onclick="document.getElementById('msgFilterUser').value='';document.getElementById('msgFilterRoom').value='';loadAllMessages();">清除</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>时间</th><th>用户</th><th>房间</th><th>内容</th><th>操作</th></tr></thead>
+                            <tbody id="msgTableBody"><tr><td colspan="5" class="empty-state">加载中...</td></tr></tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
 
-            <!-- ========== 实时日志 ========== -->
-            <div class="page" id="page-logs">
-                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-                    <span style="color:var(--text-muted);">🟢 实时监听所有表变更</span>
-                    <button class="btn-sm" onclick="document.getElementById('logBox').innerHTML='';">清空</button>
-                </div>
-                <div class="log-box" id="logBox">
-                    <div class="log-entry"><span class="time">[系统]</span> 等待事件...</div>
-                </div>
-            </div>
-
-            <!-- ========== 设置 ========== -->
-            <div class="page" id="page-settings">
-                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
-                    <h4>🎨 主题自定义</h4>
-                    <div class="color-picker-group">
-                        <label>主色 <input type="color" id="primaryColor" value="#6C5CE7" onchange="applyTheme()" /></label>
-                        <label>辅色 <input type="color" id="secondaryColor" value="#00B894" onchange="applyTheme()" /></label>
-                        <button class="btn-sm" onclick="resetTheme()">重置默认</button>
+                <!-- ========== 用户管理 ========== -->
+                <div class="page" id="page-users">
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>头像</th><th>用户名</th><th>个性签名</th><th>最后活跃</th></tr></thead>
+                            <tbody id="userTableBody"><tr><td colspan="4" class="empty-state">加载中...</td></tr></tbody>
+                        </table>
                     </div>
-                    <hr style="border-color:var(--border-color);margin:20px 0;" />
-                    <h4>🔊 声音</h4>
-                    <label style="display:flex;align-items:center;gap:10px;margin-top:8px;cursor:pointer;">
-                        <input type="checkbox" id="soundToggleDev" checked onchange="toggleSoundDev()" /> 启用提示音
-                    </label>
                 </div>
-            </div>
 
+                <!-- ========== 举报中心 ========== -->
+                <div class="page" id="page-reports">
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>举报人</th><th>被举报用户</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
+                            <tbody id="reportTableBody"><tr><td colspan="5" class="empty-state">加载中...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ========== AI 沙盒 ========== -->
+                <div class="page" id="page-ai">
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
+                        <h4>🤖 独立 AI 对话测试</h4>
+                        <p style="color:var(--text-muted);font-size:0.85rem;margin:6px 0 12px;">使用 CORS 代理，若代理失效请使用主站 @ai 功能</p>
+                        <div class="input-group" style="margin-top:12px;">
+                            <textarea id="aiPrompt" placeholder="输入你的 Prompt...">用中文简要介绍星迹聊天室</textarea>
+                            <button class="btn-sm primary" onclick="testAI()">🚀 发送</button>
+                        </div>
+                        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:16px;margin-top:12px;min-height:100px;white-space:pre-wrap;" id="aiResponse">
+                            等待响应...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 系统广播 ========== -->
+                <div class="page" id="page-broadcast">
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
+                        <h4>📢 发送系统广播</h4>
+                        <p style="color:var(--text-muted);font-size:0.85rem;margin:8px 0 12px;">将以 <strong>🛡️ 系统</strong> 身份向大厅发送公告</p>
+                        <div class="input-group">
+                            <input type="text" id="broadcastInput" placeholder="输入广播内容..." style="flex:3;" />
+                            <button class="btn-sm primary" onclick="sendBroadcast()">📨 发送</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 实时日志 ========== -->
+                <div class="page" id="page-logs">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                        <span style="color:var(--text-muted);">🟢 实时监听所有表变更</span>
+                        <button class="btn-sm" onclick="document.getElementById('logBox').innerHTML='';">清空</button>
+                    </div>
+                    <div class="log-box" id="logBox">
+                        <div class="log-entry"><span class="time">[系统]</span> 等待事件...</div>
+                    </div>
+                </div>
+
+                <!-- ========== 设置 ========== -->
+                <div class="page" id="page-settings">
+                    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:20px;">
+                        <h4>🎨 主题自定义</h4>
+                        <div class="color-picker-group">
+                            <label>主色 <input type="color" id="primaryColor" value="#6C5CE7" onchange="applyTheme()" /></label>
+                            <label>辅色 <input type="color" id="secondaryColor" value="#00B894" onchange="applyTheme()" /></label>
+                            <button class="btn-sm" onclick="resetTheme()">重置默认</button>
+                        </div>
+                        <hr style="border-color:var(--border-color);margin:20px 0;" />
+                        <h4>🔊 声音</h4>
+                        <label style="display:flex;align-items:center;gap:10px;margin-top:8px;cursor:pointer;">
+                            <input type="checkbox" id="soundToggleDev" checked onchange="toggleSoundDev()" /> 启用提示音
+                        </label>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
     <script>
         // ============================================================
-        // 配置 & 客户端
+        // 配置
         // ============================================================
         const SUPABASE_URL = 'https://nzgnqwcsgnqjffydnxtz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_igxAfIfC7M4n6SYJKkqQRA_Cj2V0ba9';
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        let currentUser = null;
+        const VALID_PASSWORDS = ['hzx7891', 'hzx139!!', 'xjchat166'];
+        const SESSION_KEY = 'dev_logged_in';
+        const SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
+
         let allMessages = [];
         let allUsers = [];
         let allReports = [];
@@ -522,96 +621,95 @@
         let logSubscription = null;
 
         // ============================================================
-        // 工具
+        // 登录逻辑
         // ============================================================
-        function sha256(str) { return CryptoJS.SHA256('StarryChat_2024' + str).toString(); }
-
-        function escapeHtml(text) {
-            const d = document.createElement('div');
-            d.textContent = text;
-            return d.innerHTML;
+        function checkSession() {
+            const session = localStorage.getItem(SESSION_KEY);
+            if (session) {
+                try {
+                    const data = JSON.parse(session);
+                    if (data.expiry && Date.now() < data.expiry) {
+                        return true;
+                    }
+                } catch (_) {}
+            }
+            return false;
         }
 
-        function playSoundDev() {
-            if (!soundEnabledDev) return;
-            try {
-                const ctx = new(window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const g = ctx.createGain();
-                osc.connect(g);
-                g.connect(ctx.destination);
-                osc.frequency.value = 660;
-                g.gain.setValueAtTime(0.1, ctx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.1);
-            } catch (_) {}
+        function attemptLogin() {
+            const input = document.getElementById('devPassword');
+            const pwd = input.value.trim();
+            const errorEl = document.getElementById('loginError');
+            if (!pwd) { errorEl.textContent = '请输入密码'; return; }
+            if (VALID_PASSWORDS.includes(pwd)) {
+                // 成功
+                const session = { expiry: Date.now() + SESSION_EXPIRY };
+                localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('appContainer').style.display = 'flex';
+                initApp();
+            } else {
+                errorEl.textContent = '❌ 密码错误，请重试';
+                input.value = '';
+                input.focus();
+            }
         }
 
-        function getAvatarUrl(username, avatar) {
-            if (avatar) return avatar;
-            const initial = (username || '?')[0].toUpperCase();
-            return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C5CE7'/%3E%3Cstop offset='100%25' stop-color='%2300B894'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='50' fill='url(%23a)'/%3E%3Ctext x='50' y='68' font-size='44' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'%3E${initial}%3C/text%3E%3C/svg%3E`;
+        // 回车登录
+        document.getElementById('devPassword').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') attemptLogin();
+        });
+
+        // 自动检测会话
+        if (checkSession()) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'flex';
+            initApp();
+        } else {
+            // 显示登录
+            document.getElementById('loginOverlay').style.display = 'flex';
         }
 
-        function formatTime(ts) {
-            if (!ts) return '-';
-            return new Date(ts).toLocaleString('zh-CN', { hour12: false });
+        // ============================================================
+        // 应用初始化
+        // ============================================================
+        function initApp() {
+            // 加载数据
+            refreshAll();
+            subscribeLogs();
+            setupNavigation();
+            // 设置用户信息（简单）
+            document.getElementById('userBadge').innerHTML = '👤 <strong>开发者</strong>';
         }
 
         // ============================================================
         // 导航
         // ============================================================
-        document.querySelectorAll('.nav-item').forEach(el => {
-            el.addEventListener('click', function() {
-                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-                this.classList.add('active');
-                const page = this.dataset.page;
-                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                const target = document.getElementById('page-' + page);
-                if (target) target.classList.add('active');
-                document.getElementById('pageTitle').textContent = this.textContent.trim();
+        function setupNavigation() {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    this.classList.add('active');
+                    const page = this.dataset.page;
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    const target = document.getElementById('page-' + page);
+                    if (target) target.classList.add('active');
+                    document.getElementById('pageTitle').textContent = this.textContent.trim();
+                });
             });
-        });
-
-        // ============================================================
-        // 登录/自动登录
-        // ============================================================
-        async function autoLoginDev() {
-            const savedToken = localStorage.getItem('starry_remember');
-            if (!savedToken) {
-                document.getElementById('userBadge').innerHTML = '⚠️ <strong>未登录</strong>';
-                return;
-            }
-            try {
-                const { data, error } = await db.from('users')
-                    .select('username, avatar, signature, remember_expires')
-                    .eq('remember_token', savedToken)
-                    .single();
-                if (data && !error && new Date(data.remember_expires) > new Date()) {
-                    currentUser = data;
-                    document.getElementById('userBadge').innerHTML = `👤 <strong>${escapeHtml(currentUser.username)}</strong> (开发者)`;
-                    // 加载所有数据
-                    refreshAll();
-                    subscribeLogs();
-                } else {
-                    localStorage.removeItem('starry_remember');
-                    document.getElementById('userBadge').innerHTML = '⚠️ <strong>会话过期</strong>';
-                }
-            } catch (_) {
-                localStorage.removeItem('starry_remember');
-                document.getElementById('userBadge').innerHTML = '⚠️ <strong>登录失效</strong>';
-            }
         }
 
+        // ============================================================
+        // 退出
+        // ============================================================
         function logoutDev() {
-            localStorage.removeItem('starry_remember');
-            alert('已退出，请重新打开页面或访问主站。');
+            localStorage.removeItem(SESSION_KEY);
+            alert('已退出，请重新登录。');
             window.location.reload();
         }
 
         // ============================================================
-        // 仪表板统计
+        // 数据加载
         // ============================================================
         async function loadStats() {
             try {
@@ -630,9 +728,6 @@
             } catch (e) { console.warn('Stats load error', e); }
         }
 
-        // ============================================================
-        // 消息管理
-        // ============================================================
         async function loadAllMessages() {
             const filterUser = document.getElementById('msgFilterUser').value.trim().toLowerCase();
             const filterRoom = document.getElementById('msgFilterRoom').value.trim().toLowerCase();
@@ -674,9 +769,6 @@
             } catch (e) { alert('删除失败: ' + e.message); }
         }
 
-        // ============================================================
-        // 用户管理
-        // ============================================================
         async function loadUsers() {
             const { data, error } = await db.from('users').select('*').order('username');
             if (error) { console.error(error); return; }
@@ -687,7 +779,7 @@
                 tbody.innerHTML = '<tr><td colspan="4" class="empty-state">暂无用户</td></tr>';
                 return;
             }
-            // 尝试获取最后活跃时间
+            // 最后活跃时间
             const { data: lastMsgs } = await db.from('messages').select('username, created_at').order('created_at', { ascending: false })
                 .limit(500);
             const lastActive = {};
@@ -708,9 +800,6 @@
             });
         }
 
-        // ============================================================
-        // 举报中心
-        // ============================================================
         async function loadReports() {
             const { data, error } = await db.from('reports').select('*').order('created_at', { ascending: false });
             if (error) { console.error(error); return; }
@@ -748,19 +837,28 @@
         }
 
         // ============================================================
-        // AI 沙盒
+        // AI 沙盒 (修复 CORS，使用代理)
         // ============================================================
         async function testAI() {
             const prompt = document.getElementById('aiPrompt').value.trim();
             if (!prompt) return;
-            document.getElementById('aiResponse').textContent = '⏳ AI 思考中...';
+            const respEl = document.getElementById('aiResponse');
+            respEl.textContent = '⏳ AI 思考中...';
             try {
-                const url = 'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai';
-                const res = await fetch(url);
+                // 使用 CORS 代理（免费且稳定）
+                const proxyUrl = 'https://corsproxy.io/?';
+                const target = 'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai';
+                const url = proxyUrl + encodeURIComponent(target);
+
+                const res = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const text = await res.text();
-                document.getElementById('aiResponse').textContent = text || '（空响应）';
-            } catch (_) {
-                document.getElementById('aiResponse').textContent = '❌ 请求失败，请稍后重试。';
+                respEl.textContent = text || '（空响应）';
+            } catch (err) {
+                console.warn('AI 请求失败', err);
+                respEl.textContent = '❌ 请求失败：' + err.message + '\n提示：CORS 代理可能失效，请改用主站 @ai 功能。';
             }
         }
 
@@ -802,7 +900,7 @@
         }
 
         // ============================================================
-        // 实时日志 (监听所有表)
+        // 实时日志
         // ============================================================
         function subscribeLogs() {
             if (logSubscription) {
@@ -828,7 +926,7 @@
         }
 
         // ============================================================
-        // 主题自定义
+        // 主题 & 声音
         // ============================================================
         function applyTheme() {
             const p = document.getElementById('primaryColor').value;
@@ -856,6 +954,42 @@
             soundEnabledDev = document.getElementById('soundToggleDev').checked;
         }
 
+        function playSoundDev() {
+            if (!soundEnabledDev) return;
+            try {
+                const ctx = new(window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.connect(g);
+                g.connect(ctx.destination);
+                osc.frequency.value = 660;
+                g.gain.setValueAtTime(0.1, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+            } catch (_) {}
+        }
+
+        // ============================================================
+        // 工具函数
+        // ============================================================
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '-';
+            return new Date(ts).toLocaleString('zh-CN', { hour12: false });
+        }
+
+        function getAvatarUrl(username, avatar) {
+            if (avatar) return avatar;
+            const initial = (username || '?')[0].toUpperCase();
+            return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C5CE7'/%3E%3Cstop offset='100%25' stop-color='%2300B894'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='50' fill='url(%23a)'/%3E%3Ctext x='50' y='68' font-size='44' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'%3E${initial}%3C/text%3E%3C/svg%3E`;
+        }
+
         // ============================================================
         // 刷新所有
         // ============================================================
@@ -867,12 +1001,9 @@
         }
 
         // ============================================================
-        // 初始化
+        // 键盘快捷键
         // ============================================================
-        window.onload = () => {
-            autoLoginDev();
-            document.getElementById('soundToggleDev').checked = true;
-            // 键盘快捷键：Ctrl+Enter 发送广播
+        document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('broadcastInput').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault();
                     sendBroadcast(); }
@@ -881,7 +1012,7 @@
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault();
                     testAI(); }
             });
-        };
+        });
     </script>
 </body>
 </html>
