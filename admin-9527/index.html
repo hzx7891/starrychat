@@ -303,6 +303,20 @@
         .input-group input:focus {
             border-color: var(--primary);
         }
+        .input-group select {
+            flex: 0.5;
+            min-width: 100px;
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-family: var(--font);
+            outline: none;
+        }
+        .input-group select:focus {
+            border-color: var(--primary);
+        }
 
         @media (max-width: 600px) {
             .admin-container {
@@ -325,7 +339,7 @@
 
     <div class="admin-container" id="app">
 
-        <!-- ===== 登录界面 ===== -->
+        <!-- 登录界面 -->
         <div id="loginSection">
             <div class="login-box">
                 <h1 style="font-size:2rem;font-weight:800;background:linear-gradient(135deg,var(--primary-light),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;">✦ 管理后台</h1>
@@ -336,7 +350,7 @@
             </div>
         </div>
 
-        <!-- ===== 管理界面 ===== -->
+        <!-- 管理界面 -->
         <div id="adminSection" style="display:none;">
             <div class="admin-header">
                 <h1>✦ 星迹 · 管理</h1>
@@ -360,6 +374,7 @@
                 <button class="tab active" data-tab="users" onclick="switchTab('users')">👥 用户管理</button>
                 <button class="tab" data-tab="reports" onclick="switchTab('reports')">🚩 举报中心</button>
                 <button class="tab" data-tab="logs" onclick="switchTab('logs')">📋 登录日志</button>
+                <button class="tab" data-tab="messages" onclick="switchTab('messages')">💬 消息管理</button>
                 <button class="tab" data-tab="broadcast" onclick="switchTab('broadcast')">📢 广播</button>
             </div>
 
@@ -376,6 +391,17 @@
             <!-- 登录日志 -->
             <div class="panel" id="panel-logs">
                 <div id="logList">加载中...</div>
+            </div>
+
+            <!-- 消息管理 -->
+            <div class="panel" id="panel-messages">
+                <div class="input-group">
+                    <input type="text" id="msgFilterUser" placeholder="用户名过滤" />
+                    <input type="text" id="msgFilterRoom" placeholder="房间过滤" />
+                    <button class="btn btn-primary btn-sm" onclick="loadAdminMessages()">🔍 搜索</button>
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('msgFilterUser').value='';document.getElementById('msgFilterRoom').value='';loadAdminMessages();">清除</button>
+                </div>
+                <div id="adminMsgList">加载中...</div>
             </div>
 
             <!-- 广播 -->
@@ -399,24 +425,17 @@
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ⚠️ 管理密码（明文，仅用于个人管理场景）
-        const ADMIN_PASSWORD = 'hzx7891';
-
+        const ADMIN_PASSWORD = 'hzx7891admin';
         let isLoggedIn = false;
 
         // ============================================================
-        // 登录（明文对比）
+        // 登录
         // ============================================================
         function adminLogin() {
             const input = document.getElementById('adminPassword');
             const pwd = input.value.trim();
             const errorEl = document.getElementById('loginError');
-
-            if (!pwd) {
-                errorEl.textContent = '请输入密码';
-                return;
-            }
-
+            if (!pwd) { errorEl.textContent = '请输入密码'; return; }
             if (pwd === ADMIN_PASSWORD) {
                 isLoggedIn = true;
                 document.getElementById('loginSection').style.display = 'none';
@@ -454,6 +473,7 @@
             if (tab === 'users') loadUsers();
             if (tab === 'reports') loadReports();
             if (tab === 'logs') loadLogs();
+            if (tab === 'messages') loadAdminMessages();
         }
 
         // ============================================================
@@ -464,6 +484,7 @@
             await loadUsers();
             await loadReports();
             await loadLogs();
+            await loadAdminMessages();
         }
 
         // ============================================================
@@ -475,8 +496,6 @@
                 const { count: msgCount } = await db.from('messages').select('*', { count: 'exact', head: true });
                 const { count: reportCount } = await db.from('reports').select('*', { count: 'exact', head: true })
                     .eq('status', 'pending');
-
-                // 优化房间统计：使用 distinct 查询
                 const { data: roomsData } = await db.from('messages').select('room');
                 const roomSet = new Set();
                 if (roomsData) roomsData.forEach(function(r) { if (r.room) roomSet.add(r.room); });
@@ -485,13 +504,11 @@
                 document.getElementById('statMessages').textContent = msgCount || 0;
                 document.getElementById('statReports').textContent = reportCount || 0;
                 document.getElementById('statRooms').textContent = roomSet.size || 0;
-            } catch (e) {
-                console.warn('Stats error', e);
-            }
+            } catch (e) { console.warn('Stats error', e); }
         }
 
         // ============================================================
-        // 用户管理（修复：事件委托 + data-username，彻底避免转义问题）
+        // 用户管理（事件委托）
         // ============================================================
         async function loadUsers() {
             try {
@@ -505,7 +522,6 @@
                 let html = '';
                 data.forEach(function(u) {
                     const isBanned = u.is_banned || false;
-                    const usernameAttr = u.username.replace(/'/g, "\\'"); // 仅用于 data 属性安全
                     html += `
                         <div class="list-item">
                             <div class="info">
@@ -525,12 +541,10 @@
                 });
                 container.innerHTML = html;
             } catch (e) {
-                document.getElementById('userList').innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(e.message) +
-                    '</div>';
+                document.getElementById('userList').innerHTML = '<div class="empty-state">加载失败</div>';
             }
         }
 
-        // 事件委托：监听 userList 上的点击事件
         document.getElementById('userList')?.addEventListener('click', function(e) {
             const btn = e.target.closest('.toggle-ban');
             if (!btn) return;
@@ -581,8 +595,7 @@
                 });
                 container.innerHTML = html;
             } catch (e) {
-                document.getElementById('reportList').innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(e.message) +
-                    '</div>';
+                document.getElementById('reportList').innerHTML = '<div class="empty-state">加载失败</div>';
             }
         }
 
@@ -621,9 +634,60 @@
                 });
                 container.innerHTML = html;
             } catch (e) {
-                document.getElementById('logList').innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(e.message) +
-                    '</div>';
+                document.getElementById('logList').innerHTML = '<div class="empty-state">加载失败</div>';
             }
+        }
+
+        // ============================================================
+        // 消息管理（新增）
+        // ============================================================
+        async function loadAdminMessages() {
+            try {
+                const filterUser = document.getElementById('msgFilterUser').value.trim().toLowerCase();
+                const filterRoom = document.getElementById('msgFilterRoom').value.trim().toLowerCase();
+
+                let query = db.from('messages').select('*').order('created_at', { ascending: false }).limit(100);
+                const { data, error } = await query;
+                if (error) { console.error(error); return; }
+                let filtered = data || [];
+                if (filterUser) filtered = filtered.filter(m => m.username.toLowerCase().includes(filterUser));
+                if (filterRoom) filtered = filtered.filter(m => (m.room || '').toLowerCase().includes(filterRoom));
+
+                const container = document.getElementById('adminMsgList');
+                if (filtered.length === 0) {
+                    container.innerHTML = '<div class="empty-state">没有找到消息</div>';
+                    return;
+                }
+                let html = '';
+                filtered.forEach(function(m) {
+                    const contentPreview = escapeHtml(m.content).substring(0, 60) + (m.content.length > 60 ? '...' :
+                        '');
+                    html += `
+                        <div class="list-item">
+                            <div class="info">
+                                <span class="name">${escapeHtml(m.username)} <span style="font-weight:400;color:var(--text-muted);">@ ${escapeHtml(m.room || '大厅')}</span></span>
+                                <span class="detail">${contentPreview} · ${formatFullTime(m.created_at)}</span>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-sm btn-danger" onclick="adminDeleteMsg('${m.id}')">删除</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (e) {
+                document.getElementById('adminMsgList').innerHTML = '<div class="empty-state">加载失败</div>';
+            }
+        }
+
+        async function adminDeleteMsg(id) {
+            if (!confirm('确认删除这条消息？')) return;
+            try {
+                await db.from('messages').delete().eq('id', id);
+                alert('✅ 已删除');
+                loadAdminMessages();
+                loadStats();
+            } catch (e) { alert('删除失败: ' + e.message); }
         }
 
         // ============================================================
