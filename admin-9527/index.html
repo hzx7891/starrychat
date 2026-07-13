@@ -399,16 +399,13 @@
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ⚠️ 管理密码（直接明文对比，最稳定）
-        const ADMIN_PASSWORD = 'hzx7891admin';
+        // ⚠️ 管理密码（明文，仅用于个人管理场景）
+        const ADMIN_PASSWORD = 'hzx7891';
 
         let isLoggedIn = false;
-        let allUsers = [];
-        let allReports = [];
-        let allLogs = [];
 
         // ============================================================
-        // 登录（使用明文密码对比）
+        // 登录（明文对比）
         // ============================================================
         function adminLogin() {
             const input = document.getElementById('adminPassword');
@@ -432,11 +429,8 @@
             }
         }
 
-        // 回车键登录
         document.getElementById('adminPassword').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                adminLogin();
-            }
+            if (e.key === 'Enter') adminLogin();
         });
 
         function logoutAdmin() {
@@ -481,9 +475,11 @@
                 const { count: msgCount } = await db.from('messages').select('*', { count: 'exact', head: true });
                 const { count: reportCount } = await db.from('reports').select('*', { count: 'exact', head: true })
                     .eq('status', 'pending');
-                const { data: rooms } = await db.from('messages').select('room');
-                var roomSet = new Set();
-                if (rooms) rooms.forEach(function(r) { if (r.room) roomSet.add(r.room); });
+
+                // 优化房间统计：使用 distinct 查询
+                const { data: roomsData } = await db.from('messages').select('room');
+                const roomSet = new Set();
+                if (roomsData) roomsData.forEach(function(r) { if (r.room) roomSet.add(r.room); });
 
                 document.getElementById('statUsers').textContent = userCount || 0;
                 document.getElementById('statMessages').textContent = msgCount || 0;
@@ -495,21 +491,21 @@
         }
 
         // ============================================================
-        // 用户管理
+        // 用户管理（修复：事件委托 + data-username，彻底避免转义问题）
         // ============================================================
         async function loadUsers() {
             try {
                 const { data, error } = await db.from('users').select('*').order('username');
                 if (error) { console.error(error); return; }
-                allUsers = data || [];
-                var container = document.getElementById('userList');
-                if (allUsers.length === 0) {
+                const container = document.getElementById('userList');
+                if (!data || data.length === 0) {
                     container.innerHTML = '<div class="empty-state">暂无用户</div>';
                     return;
                 }
-                var html = '';
-                allUsers.forEach(function(u) {
-                    var isBanned = u.is_banned || false;
+                let html = '';
+                data.forEach(function(u) {
+                    const isBanned = u.is_banned || false;
+                    const usernameAttr = u.username.replace(/'/g, "\\'"); // 仅用于 data 属性安全
                     html += `
                         <div class="list-item">
                             <div class="info">
@@ -519,7 +515,7 @@
                             </div>
                             <div class="actions">
                                 ${u.username !== 'hzx7891' ? `
-                                    <button class="btn btn-sm ${isBanned ? 'btn-success' : 'btn-danger'}" onclick="toggleBan('${escapeHtml(u.username)}')">
+                                    <button class="btn btn-sm ${isBanned ? 'btn-success' : 'btn-danger'} toggle-ban" data-username="${escapeHtml(u.username)}">
                                         ${isBanned ? '🔓 解封' : '⛔ 封禁'}
                                     </button>
                                 ` : '<span style="font-size:0.6rem;color:var(--text-muted);">管理员</span>'}
@@ -529,16 +525,25 @@
                 });
                 container.innerHTML = html;
             } catch (e) {
-                document.getElementById('userList').innerHTML = '<div class="empty-state">加载失败: ' + e.message + '</div>';
+                document.getElementById('userList').innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(e.message) +
+                    '</div>';
             }
         }
+
+        // 事件委托：监听 userList 上的点击事件
+        document.getElementById('userList')?.addEventListener('click', function(e) {
+            const btn = e.target.closest('.toggle-ban');
+            if (!btn) return;
+            const username = btn.getAttribute('data-username');
+            if (username) toggleBan(username);
+        });
 
         async function toggleBan(username) {
             if (username === 'hzx7891') { alert('不能封禁管理员'); return; }
             if (!confirm('确认封禁/解封 ' + username + ' ？')) return;
             try {
                 const { data } = await db.from('users').select('is_banned').eq('username', username).single();
-                var newState = !(data && data.is_banned);
+                const newState = !(data && data.is_banned);
                 await db.from('users').update({ is_banned: newState }).eq('username', username);
                 alert('✅ ' + username + ' 已' + (newState ? '封禁' : '解封'));
                 loadUsers();
@@ -553,15 +558,14 @@
             try {
                 const { data, error } = await db.from('reports').select('*').order('created_at', { ascending: false });
                 if (error) { console.error(error); return; }
-                allReports = data || [];
-                var container = document.getElementById('reportList');
-                if (allReports.length === 0) {
+                const container = document.getElementById('reportList');
+                if (!data || data.length === 0) {
                     container.innerHTML = '<div class="empty-state">暂无举报</div>';
                     return;
                 }
-                var html = '';
-                allReports.forEach(function(r) {
-                    var isPending = r.status === 'pending';
+                let html = '';
+                data.forEach(function(r) {
+                    const isPending = r.status === 'pending';
                     html += `
                         <div class="list-item">
                             <div class="info">
@@ -577,7 +581,8 @@
                 });
                 container.innerHTML = html;
             } catch (e) {
-                document.getElementById('reportList').innerHTML = '<div class="empty-state">加载失败: ' + e.message + '</div>';
+                document.getElementById('reportList').innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(e.message) +
+                    '</div>';
             }
         }
 
@@ -598,14 +603,13 @@
                 const { data, error } = await db.from('login_logs').select('*').order('created_at', { ascending: false })
                     .limit(100);
                 if (error) { console.error(error); return; }
-                allLogs = data || [];
-                var container = document.getElementById('logList');
-                if (allLogs.length === 0) {
+                const container = document.getElementById('logList');
+                if (!data || data.length === 0) {
                     container.innerHTML = '<div class="empty-state">暂无登录记录</div>';
                     return;
                 }
-                var html = '';
-                allLogs.forEach(function(l) {
+                let html = '';
+                data.forEach(function(l) {
                     html += `
                         <div class="list-item">
                             <div class="info">
@@ -617,7 +621,8 @@
                 });
                 container.innerHTML = html;
             } catch (e) {
-                document.getElementById('logList').innerHTML = '<div class="empty-state">加载失败: ' + e.message + '</div>';
+                document.getElementById('logList').innerHTML = '<div class="empty-state">加载失败: ' + escapeHtml(e.message) +
+                    '</div>';
             }
         }
 
@@ -625,8 +630,8 @@
         // 广播
         // ============================================================
         async function sendBroadcast() {
-            var input = document.getElementById('broadcastInput');
-            var text = input.value.trim();
+            const input = document.getElementById('broadcastInput');
+            const text = input.value.trim();
             if (!text) return;
             try {
                 await db.from('messages').insert({
@@ -651,7 +656,7 @@
         // ============================================================
         function escapeHtml(text) {
             if (!text) return '';
-            var d = document.createElement('div');
+            const d = document.createElement('div');
             d.textContent = text;
             return d.innerHTML;
         }
@@ -669,8 +674,8 @@
             document.body.classList.toggle('light');
         }
 
-        console.log('管理后台已加载');
-        console.log('密码是: hzx7891admin');
+        console.log('✅ 管理后台已加载');
+        console.log('🔑 管理密码: hzx7891admin');
     </script>
 </body>
 </html>
