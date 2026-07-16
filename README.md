@@ -14,7 +14,7 @@
 
 ## 怎么跑
 
-把 `index.html` 扔到 GitHub Pages 就行。Supabase 配置在代码里。
+把文件 `index.html` 扔到 GitHub Pages 就行。Supabase 配置在代码里。
 
 ## 管理后台
 
@@ -35,4 +35,5 @@
 
 ## 克隆仓库
 
+```bash
 git clone https://github.com/hzx7891/starrychat.git
