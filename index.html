@@ -1931,7 +1931,7 @@
                         logout();
                     }
                 } catch (_) {}
-            }, 30000);
+            }, 100);
 
             // Supabase 订阅实时更新
             banSubscription = db.channel('user-ban-' + currentUser.username)
