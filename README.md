@@ -33,6 +33,6 @@
 
 随便用。
 
-##获得仓库
+## 克隆仓库
 
 git clone https://github.com/hzx7891/starrychat.git
