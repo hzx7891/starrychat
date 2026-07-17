@@ -108,6 +108,15 @@
                 transform: rotate(360deg);
             }
         }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 0.4;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
         .loader {
             display: inline-block;
             width: 24px;
@@ -128,6 +137,62 @@
             margin-left: 10px;
             color: var(--text-muted);
             font-size: 0.85rem;
+        }
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.2s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0% {
+                content: '';
+            }
+            25% {
+                content: '.';
+            }
+            50% {
+                content: '..';
+            }
+            75% {
+                content: '...';
+            }
+            100% {
+                content: '';
+            }
+        }
+
+        /* ===== 消息加载骨架 ===== */
+        .msg-skeleton {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 18px;
+            max-width: 60%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .msg-skeleton .avatar-skel {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .msg-skeleton .line {
+            height: 12px;
+            background: var(--bg-surface);
+            border-radius: var(--radius-full);
+            margin-bottom: 4px;
+        }
+        .msg-skeleton .line-short {
+            width: 60px;
+        }
+        .msg-skeleton .line-long {
+            width: 180px;
+        }
+        .msg-skeleton.self {
+            align-self: flex-end;
+        }
+        .msg-skeleton.other {
+            align-self: flex-start;
         }
 
         .btn {
@@ -439,6 +504,21 @@
             margin-top: 10px;
             font-size: 0.85rem;
             min-height: 1.4rem;
+        }
+        .auth-box .legal-text {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 16px;
+            line-height: 1.6;
+        }
+        .auth-box .legal-text a {
+            color: var(--primary-light);
+            text-decoration: none;
+            transition: color var(--transition);
+        }
+        .auth-box .legal-text a:hover {
+            color: var(--secondary-light);
+            text-decoration: underline;
         }
         .remember-row {
             display: flex;
@@ -782,6 +862,11 @@
             color: var(--text-muted);
             cursor: default;
         }
+        .load-more-trigger .loader {
+            width: 16px;
+            height: 16px;
+            border-width: 2px;
+        }
 
         /* ===== 消息样式 ===== */
         .msg {
@@ -873,6 +958,29 @@
             color: var(--text-muted);
             margin-top: 4px;
             opacity: 0.7;
+            cursor: default;
+            position: relative;
+        }
+        .msg .msg-time .full-date {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.6rem;
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            white-space: nowrap;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .msg .msg-time:hover .full-date {
+            display: block;
+            opacity: 1;
         }
         .msg.self .msg-time {
             color: rgba(255, 255, 255, 0.6);
@@ -888,7 +996,7 @@
             transform: scale(1.02);
         }
 
-        /* 消息操作按钮（举报/删除） */
+        /* 消息操作按钮 */
         .msg-actions {
             position: absolute;
             top: 4px;
@@ -1132,6 +1240,9 @@
             .typewriter-text {
                 font-size: 1.1rem;
             }
+            .auth-box .legal-text {
+                font-size: 0.6rem;
+            }
         }
 
         /* ===== 模态框 ===== */
@@ -1321,6 +1432,12 @@
         .w-full {
             width: 100%;
         }
+        .text-blue {
+            color: var(--primary-light);
+        }
+        .text-blue:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -1372,6 +1489,13 @@
             <button class="btn btn-primary" onclick="login()">登录</button>
             <div class="switch" onclick="showRegister()">还没有账号？注册 →</div>
             <div id="loginError" class="error"></div>
+            <div class="legal-text">
+                登录注册即表示你同意
+                <a href="terms.html" target="_blank">《用户协议》</a>
+                <a href="privacy.html" target="_blank">《隐私政策》</a>
+                <a href="children.html" target="_blank">《儿童个人信息保护规则》</a>
+                <a href="rules.html" target="_blank">《社区公约》</a>
+            </div>
         </div>
         <div class="auth-box card" id="regBox" style="display:none;">
             <h2>✦ 注册</h2>
@@ -1381,6 +1505,13 @@
             <button class="btn btn-primary" onclick="register()">注册</button>
             <div class="switch" onclick="showLogin()">已有账号？返回登录</div>
             <div id="regError" class="error"></div>
+            <div class="legal-text">
+                登录注册即表示你同意
+                <a href="terms.html" target="_blank">《用户协议》</a>
+                <a href="privacy.html" target="_blank">《隐私政策》</a>
+                <a href="children.html" target="_blank">《儿童个人信息保护规则》</a>
+                <a href="rules.html" target="_blank">《社区公约》</a>
+            </div>
         </div>
     </div>
 
@@ -1496,10 +1627,20 @@
         let hasMoreMessages = true;
         let oldestMessageId = null;
         let oldestMessageCreatedAt = null;
+        let isLoadingInitial = false;
 
         // 封禁检查定时器
         let banCheckInterval = null;
         let banSubscription = null;
+
+        // 维护检查定时器
+        let maintenanceCheckInterval = null;
+
+        // 房间订阅
+        let roomSubscription = null;
+
+        // 当前房间列表
+        let currentRoomList = [];
 
         const emojis = ['😀', '😂', '😍', '😢', '😡', '👍', '👎', '🎉', '✨', '🔥', '❤️', '💔', '😭', '🤔', '😎', '😴', '😇', '🤣', '😱', '🥰', '🤩',
             '😜', '😤', '🥺', '🧐', '🤗', '😺', '🙈', '💀', '👀'
@@ -1644,6 +1785,21 @@
         }
 
         // ============================================================
+        // 路由检测
+        // ============================================================
+        function detectRoomFromURL() {
+            const path = window.location.pathname;
+            const parts = path.split('/').filter(p => p && p !== 'starrychat');
+            if (parts.length > 0) {
+                const roomName = decodeURIComponent(parts[0]);
+                if (roomName && roomName !== 'index.html' && roomName !== '') {
+                    return roomName;
+                }
+            }
+            return null;
+        }
+
+        // ============================================================
         // 个性化签名
         // ============================================================
         function showSignaturePage() {
@@ -1705,7 +1861,6 @@
         function showLogin() { document.getElementById('regBox').style.display = 'none';
             document.getElementById('loginBox').style.display = 'block'; }
 
-        // 检查维护模式
         function checkMaintenance() {
             const maintenance = localStorage.getItem('maintenance_mode');
             if (maintenance === 'true') {
@@ -1732,7 +1887,6 @@
                     return;
                 }
                 if (userData.is_banned) {
-                    // 显示申诉入口
                     const reason = prompt('⛔ 你的账号已被封禁。\n原因：' + (userData.ban_reason || '未说明') +
                         '\n\n输入申诉理由（选填），或点击取消退出：');
                     if (reason !== null) {
@@ -1759,7 +1913,6 @@
                 currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '' };
                 isAdmin = data.username === 'hzx7891';
 
-                // 记录登录日志
                 try {
                     const deviceInfo = navigator.userAgent || '未知设备';
                     await db.from('login_logs').insert({ username: u, device: deviceInfo, created_at: new Date()
@@ -1866,31 +2019,97 @@
             document.getElementById('chatApp').style.display = 'flex';
             const avatarUrl = getAvatarUrl(currentUser.username, currentUser.avatar);
             document.getElementById('myAvatar').src = avatarUrl;
-            loadRooms();
-            loadMessages('大厅', true);
-            subscribeToMessages();
-            subscribePrivateMessages();
-            subscribeCalls();
-            updateMemberList();
-            document.getElementById('chatRoomName').textContent = '🏠 大厅';
+
+            // 检测路由
+            const roomFromURL = detectRoomFromURL();
+            if (roomFromURL) {
+                // 检查房间是否存在
+                checkAndSwitchRoom(roomFromURL);
+            } else {
+                loadRooms();
+                loadMessages('大厅', true);
+                subscribeToMessages();
+                subscribePrivateMessages();
+                subscribeCalls();
+                updateMemberList();
+                document.getElementById('chatRoomName').textContent = '🏠 大厅';
+            }
+
+            // 房间列表自动刷新订阅
+            subscribeRooms();
+
+            // 封禁监控
+            startBanMonitoring();
+
+            // 维护检查（每10秒）
+            startMaintenanceMonitoring();
+
+            // 公告
+            const announcement = localStorage.getItem('site_announcement');
+            if (announcement) {
+                console.log('📢 公告：', announcement);
+            }
+
             document.getElementById('chatArea').addEventListener('click', function() {
                 const sidebar = document.getElementById('sidebar');
                 if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
             });
 
-            // 启动封禁检查（定时器 + Supabase 订阅）
-            startBanMonitoring();
+            // 输入框自动聚焦
+            setTimeout(() => {
+                document.getElementById('messageInput').focus();
+            }, 300);
+        }
 
-            // 检查是否有公告
-            const announcement = localStorage.getItem('site_announcement');
-            if (announcement) {
-                // 在顶部显示公告（可后续增强）
-                console.log('📢 公告：', announcement);
+        async function checkAndSwitchRoom(roomName) {
+            // 检查房间是否存在（通过messages表）
+            const { data } = await db.from('messages')
+                .select('room')
+                .eq('room', roomName)
+                .limit(1);
+            if (data && data.length > 0) {
+                // 房间存在，切换
+                currentRoom = roomName;
+                loadRooms();
+                loadMessages(roomName, true);
+                subscribeToMessages();
+                subscribePrivateMessages();
+                subscribeCalls();
+                updateMemberList();
+                document.getElementById('chatRoomName').textContent = '🔒 ' + roomName;
+                // 高亮房间
+                document.querySelectorAll('.room-item').forEach(el => {
+                    el.classList.toggle('active', el.textContent.includes(roomName));
+                });
+            } else {
+                // 房间不存在，显示404风格提示
+                document.getElementById('chatMessages').innerHTML = `
+                    <div style="text-align:center;padding:80px 20px;">
+                        <div style="font-size:4rem;margin-bottom:16px;">🌌</div>
+                        <h2 style="font-size:1.5rem;margin-bottom:8px;">房间不存在</h2>
+                        <p style="color:var(--text-muted);">房间 "${escapeHtml(roomName)}" 还没被创建</p>
+                        <button class="btn btn-primary" onclick="window.location.href='/starrychat/'" style="margin-top:20px;">返回星迹</button>
+                    </div>
+                `;
+                document.getElementById('chatRoomName').textContent = '❓ 未找到';
+                // 仍然加载房间列表
+                loadRooms();
+                // 恢复大厅
+                setTimeout(() => {
+                    if (currentRoom === '大厅') return;
+                    currentRoom = '大厅';
+                    document.getElementById('chatRoomName').textContent = '🏠 大厅';
+                }, 5000);
             }
         }
 
         function logout() {
             stopBanMonitoring();
+            stopMaintenanceMonitoring();
+            if (roomSubscription) {
+                try { db.removeChannel(roomSubscription); } catch (_) {}
+                roomSubscription = null;
+            }
             hangUp();
             currentUser = { username: '', avatar: '', signature: '' };
             isAdmin = false;
@@ -1914,12 +2133,32 @@
         }
 
         // ============================================================
-        // 封禁监控（实时生效）
+        // 维护监控（每10秒）
+        // ============================================================
+        function startMaintenanceMonitoring() {
+            stopMaintenanceMonitoring();
+            maintenanceCheckInterval = setInterval(() => {
+                const maintenance = localStorage.getItem('maintenance_mode');
+                if (maintenance === 'true') {
+                    alert('🔧 系统已进入维护模式，即将退出');
+                    logout();
+                }
+            }, 10000);
+        }
+
+        function stopMaintenanceMonitoring() {
+            if (maintenanceCheckInterval) {
+                clearInterval(maintenanceCheckInterval);
+                maintenanceCheckInterval = null;
+            }
+        }
+
+        // ============================================================
+        // 封禁监控（7891ms）
         // ============================================================
         function startBanMonitoring() {
             stopBanMonitoring();
 
-            // 每 30 秒检查一次
             banCheckInterval = setInterval(async () => {
                 try {
                     const { data } = await db.from('users')
@@ -1931,9 +2170,8 @@
                         logout();
                     }
                 } catch (_) {}
-            }, 100);
+            }, 7891);
 
-            // Supabase 订阅实时更新
             banSubscription = db.channel('user-ban-' + currentUser.username)
                 .on('postgres_changes', {
                     event: 'UPDATE',
@@ -1961,6 +2199,29 @@
         }
 
         // ============================================================
+        // 房间列表自动刷新（订阅）
+        // ============================================================
+        function subscribeRooms() {
+            if (roomSubscription) {
+                try { db.removeChannel(roomSubscription); } catch (_) {}
+                roomSubscription = null;
+            }
+            roomSubscription = db.channel('room-list-refresh')
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages'
+                }, payload => {
+                    const newRoom = payload.new.room;
+                    if (newRoom && !currentRoomList.includes(newRoom)) {
+                        currentRoomList.push(newRoom);
+                        loadRooms();
+                    }
+                })
+                .subscribe();
+        }
+
+        // ============================================================
         // 房间（含房主机制）
         // ============================================================
         let roomOwners = {};
@@ -1977,6 +2238,7 @@
                 });
                 roomSet.forEach(r => { if (r !== '大厅') rooms.push(r); });
             }
+            currentRoomList = rooms;
             list.innerHTML = '';
             rooms.forEach(room => {
                 const div = document.createElement('div');
@@ -2000,6 +2262,16 @@
         }
 
         function switchRoom(room) {
+            // 更新URL（不刷新页面）
+            if (room !== '大厅') {
+                const newUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') + '/' +
+                encodeURIComponent(room);
+                window.history.pushState({ room: room }, '', newUrl);
+            } else {
+                const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') + '/';
+                window.history.pushState({ room: '大厅' }, '', baseUrl);
+            }
+
             currentRoom = room;
             document.getElementById('chatRoomName').textContent = room === '大厅' ? '🏠 大厅' : '🔒 ' + room;
             document.getElementById('chatMessages').innerHTML = '';
@@ -2021,9 +2293,14 @@
             });
             document.getElementById('sidebar').classList.remove('show');
             updateMemberList();
+
+            // 输入框自动聚焦
+            setTimeout(() => {
+                document.getElementById('messageInput').focus();
+            }, 300);
         }
 
-        function showCreateRoom() {
+        async function showCreateRoom() {
             const name = prompt('🏷️ 输入房间名：');
             if (name && name.trim()) {
                 const roomName = name.trim();
@@ -2032,6 +2309,16 @@
                         true; });
                 if (!exists) {
                     roomOwners[roomName] = currentUser.username;
+                    // 插入系统消息占位，让房间立刻出现在列表
+                    await db.from('messages').insert({
+                        room: roomName,
+                        username: '🛡️ 系统',
+                        content: '✨ 房间 "' + roomName + '" 已创建！欢迎来聊天～',
+                        type: 'text',
+                        avatar: '',
+                        room_owner: currentUser.username,
+                        created_at: new Date().toISOString()
+                    });
                     const div = document.createElement('div');
                     div.className = 'room-item';
                     div.innerHTML = `
@@ -2045,6 +2332,10 @@
                         switchRoom(roomName);
                     };
                     document.getElementById('roomList').appendChild(div);
+                    // 更新URL
+                    const newUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') + '/' +
+                        encodeURIComponent(roomName);
+                    window.history.pushState({ room: roomName }, '', newUrl);
                 }
                 switchRoom(roomName);
             }
@@ -2058,14 +2349,19 @@
                 document.querySelectorAll('.room-item').forEach(el => {
                     if (el.textContent.includes(room)) el.remove();
                 });
-                if (currentRoom === room) switchRoom('大厅');
+                if (currentRoom === room) {
+                    const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') + '/';
+                    window.history.pushState({ room: '大厅' }, '', baseUrl);
+                    switchRoom('大厅');
+                }
                 alert('✅ 房间已删除');
                 delete roomOwners[room];
+                currentRoomList = currentRoomList.filter(r => r !== room);
             } catch (e) { alert('删除失败: ' + e.message); }
         }
 
         // ============================================================
-        // 消息系统（分页加载）
+        // 消息系统（分页加载，修复30条Bug）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2082,6 +2378,13 @@
                 document.getElementById('chatMessages').appendChild(trigger);
             }
 
+            // 显示加载动画
+            const trigger = document.getElementById('loadMoreTrigger');
+            if (trigger && reset) {
+                trigger.innerHTML = '<span class="loader loader-sm"></span> <span class="loading-text">加载中...</span>';
+                trigger.className = 'load-more-trigger loading';
+            }
+
             try {
                 let query = db.from('messages')
                     .select('*')
@@ -2096,14 +2399,26 @@
                         const filtered = data.filter(m => m.content.toLowerCase().includes(searchKeyword.toLowerCase()));
                         if (filtered.length > 0) {
                             renderMessages(filtered);
+                        } else {
+                            document.getElementById('chatMessages').innerHTML =
+                                '<div class="text-muted text-center" style="padding:40px 0;">🔍 没有找到包含 "' +
+                                escapeHtml(searchKeyword) + '" 的消息</div>';
+                        }
+                        if (trigger) {
+                            trigger.textContent = '—— 已加载全部消息 ——';
+                            trigger.className = 'load-more-trigger';
+                            trigger.style.display = 'none';
                         }
                         return;
                     }
                 }
 
                 const { data, error } = await query;
-                if (error) { console.error('加载消息失败', error); return; }
+                if (error) { console.error('加载消息失败', error);
+                    isLoadingInitial = false; return; }
                 if (data && data.length > 0) {
+                    // 清除之前的骨架
+                    document.querySelectorAll('.msg-skeleton').forEach(el => el.remove());
                     renderMessages(data);
                     if (data.length > 0) {
                         oldestMessageId = data[0].id;
@@ -2112,8 +2427,11 @@
                 }
                 if (data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
-                    document.getElementById('loadMoreTrigger').textContent = '—— 已加载全部消息 ——';
-                    document.getElementById('loadMoreTrigger').style.display = 'none';
+                    if (trigger) {
+                        trigger.textContent = '—— 已加载全部消息 ——';
+                        trigger.className = 'load-more-trigger';
+                        trigger.style.display = 'none';
+                    }
                 } else {
                     // 检查是否有更早消息
                     const { data: earlierCheck } = await db.from('messages')
@@ -2122,16 +2440,23 @@
                         .lt('created_at', oldestMessageCreatedAt || new Date().toISOString())
                         .limit(1);
                     if (earlierCheck && earlierCheck.length > 0) {
-                        document.getElementById('loadMoreTrigger').style.display = 'block';
-                        document.getElementById('loadMoreTrigger').textContent = '⬆ 点击加载更早消息';
+                        if (trigger) {
+                            trigger.style.display = 'block';
+                            trigger.textContent = '⬆ 点击加载更早消息';
+                            trigger.className = 'load-more-trigger';
+                        }
                     } else {
                         hasMoreMessages = false;
-                        document.getElementById('loadMoreTrigger').textContent = '—— 已加载全部消息 ——';
-                        document.getElementById('loadMoreTrigger').style.display = 'none';
+                        if (trigger) {
+                            trigger.textContent = '—— 已加载全部消息 ——';
+                            trigger.className = 'load-more-trigger';
+                            trigger.style.display = 'none';
+                        }
                     }
                 }
                 document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
             } catch (e) { console.error('加载消息异常', e); }
+            isLoadingInitial = false;
         }
 
         function renderMessages(messages) {
@@ -2168,13 +2493,17 @@
             }
 
             const timeStr = msg.created_at ? formatTime(msg.created_at) : '';
+            const fullDateStr = msg.created_at ? formatFullTime(msg.created_at) : '';
 
             div.innerHTML = `
                 <img class="avatar" src="${avatarUrl}" onclick="showProfile('${escapeHtml(msg.username)}')" />
                 <div class="msg-content">
                   <div class="msg-username">${escapeHtml(msg.username)}</div>
                   ${contentHtml}
-                  <div class="msg-time">${timeStr}</div>
+                  <div class="msg-time">
+                    ${timeStr}
+                    <span class="full-date">${fullDateStr}</span>
+                  </div>
                 </div>
                 ${!isSystem ? `
                   <div class="msg-actions">
@@ -2202,7 +2531,7 @@
             if (isLoadingMore || !hasMoreMessages) return;
             isLoadingMore = true;
             const trigger = document.getElementById('loadMoreTrigger');
-            trigger.textContent = '⏳ 加载中...';
+            trigger.innerHTML = '<span class="loader loader-sm"></span> <span class="loading-text">加载中...</span>';
             trigger.className = 'load-more-trigger loading';
 
             try {
@@ -2262,10 +2591,15 @@
                 table: 'messages' }, payload => {
                 const msg = payload.new;
                 if (msg.room === currentRoom) {
+                    // 直接渲染新消息，不重新加载整个列表
                     renderMessage(msg);
                     if (msg.username !== currentUser.username) playSound();
                 }
-                loadRooms();
+                // 更新房间列表（新房间出现）
+                if (msg.room && !currentRoomList.includes(msg.room)) {
+                    currentRoomList.push(msg.room);
+                    loadRooms();
+                }
             }).subscribe();
             wsChannels.push(ch);
         }
@@ -2302,7 +2636,6 @@
             const text = input.value.trim();
             if (!text || !currentUser.username) return;
 
-            // 实时检查封禁（发送前再次确认）
             try {
                 const { data: userData } = await db.from('users')
                     .select('is_banned')
@@ -2341,6 +2674,7 @@
                 };
                 renderMessage(aiMsg);
                 document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+                input.focus();
                 return;
             }
 
@@ -2374,7 +2708,7 @@
         }
 
         // ============================================================
-        // 搜索
+        // 搜索（修复清除后完整恢复）
         // ============================================================
         function searchMessages() {
             const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
@@ -2384,6 +2718,18 @@
 
         function clearSearch() {
             document.getElementById('searchInput').value = '';
+            // 完整恢复消息列表
+            document.getElementById('chatMessages').innerHTML = '';
+            currentPage = 0;
+            hasMoreMessages = true;
+            oldestMessageId = null;
+            oldestMessageCreatedAt = null;
+            const trigger = document.createElement('div');
+            trigger.className = 'load-more-trigger';
+            trigger.id = 'loadMoreTrigger';
+            trigger.textContent = '⬆ 点击加载更早消息';
+            trigger.onclick = loadMoreMessages;
+            document.getElementById('chatMessages').appendChild(trigger);
             loadMessages(currentRoom, true);
         }
 
@@ -2415,6 +2761,7 @@
                         avatar: currentUser.avatar || '',
                         room_owner: currentRoom !== '大厅' ? roomOwners[currentRoom] || currentUser.username : null
                     });
+                    document.getElementById('messageInput').focus();
                 } catch (err) { alert('文件上传失败：' + err.message); }
             };
             reader.readAsDataURL(file);
@@ -2571,12 +2918,16 @@
             div.className = 'msg ' + (isSelf ? 'self' : 'other');
             div.style.maxWidth = '85%';
             const timeStr = msg.created_at ? formatTime(msg.created_at) : '';
+            const fullDateStr = msg.created_at ? formatFullTime(msg.created_at) : '';
             div.innerHTML = `
                 <img class="avatar avatar-sm" src="${getAvatarUrl(msg.sender, '')}" />
                 <div class="msg-content">
                   ${!isSelf ? `<div class="msg-username">${escapeHtml(msg.sender)}</div>` : ''}
                   <div class="msg-text">${escapeHtml(msg.content)}</div>
-                  <div class="msg-time">${timeStr}</div>
+                  <div class="msg-time">
+                    ${timeStr}
+                    <span class="full-date">${fullDateStr}</span>
+                  </div>
                 </div>`;
             box.appendChild(div);
         }
@@ -2687,7 +3038,7 @@
             document.getElementById('soundToggle').textContent = soundEnabled ? '🔔' : '🔕'; }
 
         // ============================================================
-        // 键盘事件
+        // 键盘事件 + 历史路由
         // ============================================================
         document.getElementById('messageInput').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e
                 .preventDefault();
@@ -2698,6 +3049,29 @@
         document.querySelectorAll('.modal-overlay').forEach(overlay => { overlay.addEventListener('click', (e) => { if (e
                 .target === overlay) { overlay.classList.remove('active');
                 overlay.style.display = 'none'; } }); });
+
+        // 浏览器后退/前进时切换房间
+        window.addEventListener('popstate', function(event) {
+            const room = event.state?.room;
+            if (room && room !== currentRoom) {
+                if (room === '大厅') {
+                    switchRoom('大厅');
+                } else {
+                    // 检查房间是否存在
+                    db.from('messages').select('room').eq('room', room).limit(1).then(({ data }) => {
+                        if (data && data.length > 0) {
+                            switchRoom(room);
+                        } else {
+                            // 房间不存在，回到大厅
+                            const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') +
+                                '/';
+                            window.history.pushState({ room: '大厅' }, '', baseUrl);
+                            switchRoom('大厅');
+                        }
+                    });
+                }
+            }
+        });
 
         window.onload = () => { autoLogin(); };
     </script>
