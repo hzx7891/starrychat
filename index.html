@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
     <style>
-        /* ===== 全局样式 ===== */
+        /* ===== 全局样式（完整，含兼容） ===== */
         * {
             margin: 0;
             padding: 0;
@@ -831,6 +831,7 @@
             border: none;
             background: transparent;
             font-family: var(--font);
+            display: block;  /* 保证锚点存在 */
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -845,7 +846,7 @@
             border-width: 2px;
         }
 
-        /* ===== 消息样式（事件委托，无onclick拼接） ===== */
+        /* ===== 消息样式 ===== */
         .msg {
             display: flex;
             align-items: flex-start;
@@ -972,7 +973,7 @@
             transform: scale(1.02);
         }
 
-        /* ===== 消息操作按钮（无onclick，使用事件委托） ===== */
+        /* ===== 消息操作按钮 ===== */
         .msg-actions {
             position: absolute;
             top: 4px;
@@ -1651,18 +1652,15 @@
         // ============================================================
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
 
-        // 随机盐生成
         function generateSalt() {
             return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         }
 
-        // 带盐的密码哈希
         function hashPassword(password, salt) {
             const effectiveSalt = salt || 'StarryChat_2024';
             return sha256(effectiveSalt + password + effectiveSalt);
         }
 
-        // 设备指纹
         function getDeviceFingerprint() {
             const components = [
                 navigator.userAgent || '',
@@ -1680,7 +1678,6 @@
             return div.innerHTML;
         }
 
-        // 安全的URL验证（只允许 http/https）
         function isValidUrl(url) {
             try {
                 const parsed = new URL(url);
@@ -1688,7 +1685,6 @@
             } catch (_) { return false; }
         }
 
-        // 安全的链接渲染
         function safeLinkify(text) {
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             return text.replace(urlRegex, function(match) {
@@ -1900,7 +1896,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（修复：随机盐、统一错误提示）
+        // 登录 / 注册
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1930,7 +1926,6 @@
             }
 
             try {
-                // 合并查询：一次获取所有信息
                 const { data, error } = await db.from('users')
                     .select('username, avatar, signature, salt, is_banned, ban_reason, role')
                     .eq('username', u)
@@ -1958,7 +1953,6 @@
                     return;
                 }
 
-                // 兼容旧用户：如果盐为空，使用默认盐
                 const salt = data.salt || 'StarryChat_2024';
                 const hashedInput = hashPassword(p, salt);
                 if (hashedInput !== data.password_hash) {
@@ -1974,7 +1968,6 @@
                 };
                 isAdmin = data.role === 'admin' || data.username === 'hzx7891';
 
-                // 记录登录日志
                 try {
                     const deviceInfo = navigator.userAgent || '未知设备';
                     await db.from('login_logs').insert({ username: u, device: deviceInfo, created_at: new Date()
@@ -2062,7 +2055,6 @@
                         .eq('remember_token', savedToken)
                         .single();
                     if (data && !error && new Date(data.remember_expires) > new Date()) {
-                        // 设备指纹校验
                         if (data.remember_device && savedDevice && data.remember_device !== savedDevice) {
                             localStorage.removeItem('starry_remember');
                             localStorage.removeItem('starry_device');
@@ -2261,7 +2253,7 @@
         }
 
         // ============================================================
-        // 房间（含房主机制）
+        // 房间
         // ============================================================
         let roomOwners = {};
 
@@ -2319,7 +2311,6 @@
                 window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath + '/');
             }
 
-            // 清理旧消息订阅
             wsChannels = wsChannels.filter(ch => {
                 if (ch.topic && ch.topic.includes('messages')) {
                     try { db.removeChannel(ch); } catch (_) {}
@@ -2423,7 +2414,7 @@
         }
 
         // ============================================================
-        // 消息系统（事件委托，无onclick拼接）
+        // 消息系统（事件委托 + 分页修复）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2465,10 +2456,11 @@
                                 '<div class="text-muted text-center" style="padding:40px 0;">🔍 没有找到包含 "' +
                                 escapeHtml(searchKeyword) + '" 的消息</div>';
                         }
+                        // 搜索完不隐藏触发器，保留锚点
                         if (trigger) {
                             trigger.textContent = '—— 已加载全部消息 ——';
                             trigger.className = 'load-more-trigger';
-                            trigger.style.display = 'none';
+                            trigger.style.display = 'block';
                         }
                         return;
                     }
@@ -2485,20 +2477,24 @@
                         oldestMessageCreatedAt = data[0].created_at;
                     }
                 }
+
+                // ===== 分页逻辑修复 =====
                 if (data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
                     if (trigger) {
                         trigger.textContent = '—— 已加载全部消息 ——';
                         trigger.className = 'load-more-trigger';
-                        trigger.style.display = 'none';
+                        trigger.style.display = 'block';  // 保留占位
                     }
                 } else {
+                    // 检查是否有更早消息
                     const { data: earlierCheck } = await db.from('messages')
                         .select('id')
                         .eq('room', room)
                         .lt('created_at', oldestMessageCreatedAt || new Date().toISOString())
                         .limit(1);
                     if (earlierCheck && earlierCheck.length > 0) {
+                        hasMoreMessages = true;
                         if (trigger) {
                             trigger.style.display = 'block';
                             trigger.textContent = '⬆ 点击加载更早消息';
@@ -2509,7 +2505,7 @@
                         if (trigger) {
                             trigger.textContent = '—— 已加载全部消息 ——';
                             trigger.className = 'load-more-trigger';
-                            trigger.style.display = 'none';
+                            trigger.style.display = 'block';
                         }
                     }
                 }
@@ -2529,7 +2525,7 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // ===== 核心：无onclick拼接，使用 data-* 属性 + 事件委托 =====
+        // 无onclick拼接，使用 data-* 属性
         function renderMessageToElement(div, msg) {
             const isSelf = msg.username === currentUser.username;
             const isSystem = msg.username === '🛡️ 系统';
@@ -2546,7 +2542,6 @@
                 contentHtml =
                     `<img src="${escapeHtml(msg.content)}" class="msg-img" onclick="window.open('${escapeHtml(msg.content)}','_blank')" />`;
             } else if (msg.type === 'file') {
-                // 修复：协议注入防护
                 if (isValidUrl(msg.content)) {
                     contentHtml =
                         `<div>📄 <a href="${escapeHtml(msg.content)}" target="_blank" class="link-safe">查看文件</a></div>`;
@@ -2560,7 +2555,6 @@
             const timeStr = msg.created_at ? formatTime(msg.created_at) : '';
             const fullDateStr = msg.created_at ? formatFullTime(msg.created_at) : '';
 
-            // 无onclick拼接！使用 data-* 属性
             div.innerHTML = `
                 <img class="avatar" src="${avatarUrl}" data-action="profile" data-username="${escapeHtml(msg.username)}" />
                 <div class="msg-content">
@@ -2580,11 +2574,10 @@
               `;
         }
 
-        // ===== 事件委托（处理所有消息操作） =====
+        // 事件委托
         document.getElementById('chatMessages').addEventListener('click', async function(e) {
             const target = e.target;
 
-            // 1. 举报按钮
             if (target.classList.contains('report-btn')) {
                 const msgId = target.dataset.msgid;
                 const username = target.dataset.username;
@@ -2608,7 +2601,6 @@
                 return;
             }
 
-            // 2. 删除按钮
             if (target.classList.contains('delete-btn')) {
                 const msgId = target.dataset.msgid;
                 if (msgId && confirm('确认删除这条消息？')) {
@@ -2621,7 +2613,6 @@
                 return;
             }
 
-            // 3. 头像点击（查看个人资料）
             if (target.classList.contains('avatar') && target.dataset.action === 'profile') {
                 const username = target.dataset.username;
                 if (username) showProfile(username);
@@ -2684,7 +2675,7 @@
                         hasMoreMessages = false;
                         trigger.textContent = '—— 已加载全部消息 ——';
                         trigger.className = 'load-more-trigger';
-                        trigger.style.display = 'none';
+                        trigger.style.display = 'block';
                     } else {
                         trigger.textContent = '⬆ 点击加载更早消息';
                         trigger.className = 'load-more-trigger';
@@ -2693,7 +2684,7 @@
                     hasMoreMessages = false;
                     trigger.textContent = '—— 已加载全部消息 ——';
                     trigger.className = 'load-more-trigger';
-                    trigger.style.display = 'none';
+                    trigger.style.display = 'block';
                 }
             } catch (e) {
                 console.error('加载更早消息异常', e);
@@ -2703,9 +2694,6 @@
             isLoadingMore = false;
         }
 
-        // ============================================================
-        // 消息订阅
-        // ============================================================
         function subscribeToMessages() {
             wsChannels = wsChannels.filter(ch => {
                 if (ch.topic && ch.topic.includes('public:messages')) {
@@ -2734,98 +2722,6 @@
                 })
                 .subscribe();
             wsChannels.push(ch);
-        }
-
-        // ============================================================
-        // 私聊
-        // ============================================================
-        function openPrivateChat(target) {
-            if (target === currentUser.username) return;
-            privateTarget = target;
-
-            // 清理旧的私聊订阅
-            wsChannels = wsChannels.filter(ch => {
-                const chName = ch.topic || ch.channelName || '';
-                if (chName.includes('private_messages')) {
-                    try { db.removeChannel(ch); } catch (_) {}
-                    return false;
-                }
-                return true;
-            });
-
-            document.getElementById('privateChatTitle').textContent = '💬 私聊 · ' + target;
-            document.getElementById('privateChatMessages').innerHTML = '';
-            loadPrivateMessages(target);
-            subscribePrivateMessages();
-            openModal('privateChatModal');
-            setTimeout(() => document.getElementById('privateChatInput').focus(), 300);
-        }
-
-        async function loadPrivateMessages(target) {
-            const { data } = await db.from('private_messages').select('*').or(
-                `sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`).order('created_at', { ascending: true });
-            if (data) {
-                const box = document.getElementById('privateChatMessages');
-                box.innerHTML = '';
-                data.filter(m => (m.sender === currentUser.username && m.receiver === target) || (m.sender === target && m
-                    .receiver === currentUser.username)).forEach(m => appendPrivateMessage(m, m.sender === currentUser
-                    .username));
-                box.scrollTop = box.scrollHeight;
-            }
-        }
-
-        function subscribePrivateMessages() {
-            const ch = db.channel('private_messages-' + currentUser.username + '-' + privateTarget)
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'private_messages'
-                }, payload => {
-                    const msg = payload.new;
-                    if ((msg.sender === currentUser.username && msg.receiver === privateTarget) || (msg.sender ===
-                            privateTarget && msg.receiver === currentUser.username)) {
-                        appendPrivateMessage(msg, msg.sender === currentUser.username);
-                        const box = document.getElementById('privateChatMessages');
-                        if (box) box.scrollTop = box.scrollHeight;
-                        if (msg.sender !== currentUser.username) playSound();
-                    }
-                })
-                .subscribe();
-            wsChannels.push(ch);
-        }
-
-        async function sendPrivateMessage() {
-            const input = document.getElementById('privateChatInput');
-            const text = input.value.trim();
-            if (!text || !privateTarget) return;
-            if (containsBlockedText(text)) { alert('⚠️ 消息包含违规内容，无法发送。'); return; }
-            try {
-                await db.from('private_messages').insert({ sender: currentUser.username, receiver: privateTarget,
-                    content: text });
-                input.value = '';
-                input.focus();
-            } catch (err) { alert('私聊发送失败：' + err.message); }
-        }
-
-        function appendPrivateMessage(msg, isSelf) {
-            const box = document.getElementById('privateChatMessages');
-            if (!box) return;
-            const div = document.createElement('div');
-            div.className = 'msg ' + (isSelf ? 'self' : 'other');
-            div.style.maxWidth = '85%';
-            const timeStr = msg.created_at ? formatTime(msg.created_at) : '';
-            const fullDateStr = msg.created_at ? formatFullTime(msg.created_at) : '';
-            div.innerHTML = `
-                <img class="avatar avatar-sm" src="${getAvatarUrl(msg.sender, '')}" />
-                <div class="msg-content">
-                  ${!isSelf ? `<div class="msg-username">${escapeHtml(msg.sender)}</div>` : ''}
-                  <div class="msg-text">${escapeHtml(msg.content)}</div>
-                  <div class="msg-time">
-                    ${timeStr}
-                    <span class="full-date">${fullDateStr}</span>
-                  </div>
-                </div>`;
-            box.appendChild(div);
         }
 
         // ============================================================
@@ -3065,6 +2961,97 @@
                     </div>`;
                 openModal('profileModal');
             }
+        }
+
+        // ============================================================
+        // 私聊
+        // ============================================================
+        function openPrivateChat(target) {
+            if (target === currentUser.username) return;
+            privateTarget = target;
+
+            wsChannels = wsChannels.filter(ch => {
+                const chName = ch.topic || ch.channelName || '';
+                if (chName.includes('private_messages')) {
+                    try { db.removeChannel(ch); } catch (_) {}
+                    return false;
+                }
+                return true;
+            });
+
+            document.getElementById('privateChatTitle').textContent = '💬 私聊 · ' + target;
+            document.getElementById('privateChatMessages').innerHTML = '';
+            loadPrivateMessages(target);
+            subscribePrivateMessages();
+            openModal('privateChatModal');
+            setTimeout(() => document.getElementById('privateChatInput').focus(), 300);
+        }
+
+        async function loadPrivateMessages(target) {
+            const { data } = await db.from('private_messages').select('*').or(
+                `sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`).order('created_at', { ascending: true });
+            if (data) {
+                const box = document.getElementById('privateChatMessages');
+                box.innerHTML = '';
+                data.filter(m => (m.sender === currentUser.username && m.receiver === target) || (m.sender === target && m
+                    .receiver === currentUser.username)).forEach(m => appendPrivateMessage(m, m.sender === currentUser
+                    .username));
+                box.scrollTop = box.scrollHeight;
+            }
+        }
+
+        function subscribePrivateMessages() {
+            const ch = db.channel('private_messages-' + currentUser.username + '-' + privateTarget)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'private_messages'
+                }, payload => {
+                    const msg = payload.new;
+                    if ((msg.sender === currentUser.username && msg.receiver === privateTarget) || (msg.sender ===
+                            privateTarget && msg.receiver === currentUser.username)) {
+                        appendPrivateMessage(msg, msg.sender === currentUser.username);
+                        const box = document.getElementById('privateChatMessages');
+                        if (box) box.scrollTop = box.scrollHeight;
+                        if (msg.sender !== currentUser.username) playSound();
+                    }
+                })
+                .subscribe();
+            wsChannels.push(ch);
+        }
+
+        async function sendPrivateMessage() {
+            const input = document.getElementById('privateChatInput');
+            const text = input.value.trim();
+            if (!text || !privateTarget) return;
+            if (containsBlockedText(text)) { alert('⚠️ 消息包含违规内容，无法发送。'); return; }
+            try {
+                await db.from('private_messages').insert({ sender: currentUser.username, receiver: privateTarget,
+                    content: text });
+                input.value = '';
+                input.focus();
+            } catch (err) { alert('私聊发送失败：' + err.message); }
+        }
+
+        function appendPrivateMessage(msg, isSelf) {
+            const box = document.getElementById('privateChatMessages');
+            if (!box) return;
+            const div = document.createElement('div');
+            div.className = 'msg ' + (isSelf ? 'self' : 'other');
+            div.style.maxWidth = '85%';
+            const timeStr = msg.created_at ? formatTime(msg.created_at) : '';
+            const fullDateStr = msg.created_at ? formatFullTime(msg.created_at) : '';
+            div.innerHTML = `
+                <img class="avatar avatar-sm" src="${getAvatarUrl(msg.sender, '')}" />
+                <div class="msg-content">
+                  ${!isSelf ? `<div class="msg-username">${escapeHtml(msg.sender)}</div>` : ''}
+                  <div class="msg-text">${escapeHtml(msg.content)}</div>
+                  <div class="msg-time">
+                    ${timeStr}
+                    <span class="full-date">${fullDateStr}</span>
+                  </div>
+                </div>`;
+            box.appendChild(div);
         }
 
         // ============================================================
