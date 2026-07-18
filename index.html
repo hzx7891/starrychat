@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
     <style>
-        /* ===== 全局（含Safari兼容） ===== */
+        /* ===== 全局样式（保持原有） ===== */
         * {
             margin: 0;
             padding: 0;
@@ -138,29 +138,6 @@
             color: var(--text-muted);
             font-size: 0.85rem;
         }
-        .loading-dots::after {
-            content: '';
-            animation: dots 1.2s steps(4, end) infinite;
-        }
-        @keyframes dots {
-            0% {
-                content: '';
-            }
-            25% {
-                content: '.';
-            }
-            50% {
-                content: '..';
-            }
-            75% {
-                content: '...';
-            }
-            100% {
-                content: '';
-            }
-        }
-
-        /* ===== 消息加载骨架 ===== */
         .msg-skeleton {
             display: flex;
             align-items: flex-start;
@@ -1438,6 +1415,24 @@
         .text-blue:hover {
             text-decoration: underline;
         }
+        .room-not-found {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        .room-not-found .icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+        .room-not-found h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        .room-not-found p {
+            color: var(--text-muted);
+        }
+        .room-not-found .btn {
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -1853,7 +1848,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册
+        // 登录 / 注册（保持原有逻辑，确保能登录）
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -2013,6 +2008,14 @@
         }
 
         function enterChat() {
+            // 清理之前的监控
+            stopBanMonitoring();
+            stopMaintenanceMonitoring();
+            if (roomSubscription) {
+                try { db.removeChannel(roomSubscription); } catch (_) {}
+                roomSubscription = null;
+            }
+
             document.getElementById('authPage').style.display = 'none';
             document.getElementById('welcomePage').style.display = 'none';
             document.getElementById('signaturePage').style.display = 'none';
@@ -2023,7 +2026,6 @@
             // 检测路由
             const roomFromURL = detectRoomFromURL();
             if (roomFromURL) {
-                // 检查房间是否存在
                 checkAndSwitchRoom(roomFromURL);
             } else {
                 loadRooms();
@@ -2038,13 +2040,12 @@
             // 房间列表自动刷新订阅
             subscribeRooms();
 
-            // 封禁监控
+            // 封禁监控（7891ms）
             startBanMonitoring();
 
             // 维护检查（每10秒）
             startMaintenanceMonitoring();
 
-            // 公告
             const announcement = localStorage.getItem('site_announcement');
             if (announcement) {
                 console.log('📢 公告：', announcement);
@@ -2055,81 +2056,33 @@
                 if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
             });
 
-            // 输入框自动聚焦
             setTimeout(() => {
                 document.getElementById('messageInput').focus();
             }, 300);
         }
 
-        async function checkAndSwitchRoom(roomName) {
-            // 检查房间是否存在（通过messages表）
-            const { data } = await db.from('messages')
-                .select('room')
-                .eq('room', roomName)
-                .limit(1);
-            if (data && data.length > 0) {
-                // 房间存在，切换
-                currentRoom = roomName;
-                loadRooms();
-                loadMessages(roomName, true);
-                subscribeToMessages();
-                subscribePrivateMessages();
-                subscribeCalls();
-                updateMemberList();
-                document.getElementById('chatRoomName').textContent = '🔒 ' + roomName;
-                // 高亮房间
-                document.querySelectorAll('.room-item').forEach(el => {
-                    el.classList.toggle('active', el.textContent.includes(roomName));
-                });
-            } else {
-                // 房间不存在，显示404风格提示
-                document.getElementById('chatMessages').innerHTML = `
-                    <div style="text-align:center;padding:80px 20px;">
-                        <div style="font-size:4rem;margin-bottom:16px;">🌌</div>
-                        <h2 style="font-size:1.5rem;margin-bottom:8px;">房间不存在</h2>
-                        <p style="color:var(--text-muted);">房间 "${escapeHtml(roomName)}" 还没被创建</p>
-                        <button class="btn btn-primary" onclick="window.location.href='/starrychat/'" style="margin-top:20px;">返回星迹</button>
-                    </div>
-                `;
-                document.getElementById('chatRoomName').textContent = '❓ 未找到';
-                // 仍然加载房间列表
-                loadRooms();
-                // 恢复大厅
-                setTimeout(() => {
-                    if (currentRoom === '大厅') return;
-                    currentRoom = '大厅';
-                    document.getElementById('chatRoomName').textContent = '🏠 大厅';
-                }, 5000);
+        // ============================================================
+        // 封禁监控停止
+        // ============================================================
+        function stopBanMonitoring() {
+            if (banCheckInterval) {
+                clearInterval(banCheckInterval);
+                banCheckInterval = null;
+            }
+            if (banSubscription) {
+                try { db.removeChannel(banSubscription); } catch (_) {}
+                banSubscription = null;
             }
         }
 
-        function logout() {
-            stopBanMonitoring();
-            stopMaintenanceMonitoring();
-            if (roomSubscription) {
-                try { db.removeChannel(roomSubscription); } catch (_) {}
-                roomSubscription = null;
+        // ============================================================
+        // 维护监控停止
+        // ============================================================
+        function stopMaintenanceMonitoring() {
+            if (maintenanceCheckInterval) {
+                clearInterval(maintenanceCheckInterval);
+                maintenanceCheckInterval = null;
             }
-            hangUp();
-            currentUser = { username: '', avatar: '', signature: '' };
-            isAdmin = false;
-            localStorage.removeItem('starry_remember');
-            document.getElementById('chatApp').style.display = 'none';
-            document.getElementById('authPage').style.display = 'flex';
-            wsChannels.forEach(ch => { try { db.removeChannel(ch) } catch (_) {} });
-            wsChannels = [];
-            if (pc) { pc.close();
-                pc = null; }
-            if (localStream) { localStream.getTracks().forEach(t => t.stop());
-                localStream = null; }
-            document.getElementById('videoCallModal').classList.remove('active');
-            document.getElementById('videoCallModal').style.display = 'none';
-            document.getElementById('remoteVideo').srcObject = null;
-            document.getElementById('localVideo').srcObject = null;
-            currentPage = 0;
-            hasMoreMessages = true;
-            oldestMessageId = null;
-            oldestMessageCreatedAt = null;
         }
 
         // ============================================================
@@ -2144,13 +2097,6 @@
                     logout();
                 }
             }, 10000);
-        }
-
-        function stopMaintenanceMonitoring() {
-            if (maintenanceCheckInterval) {
-                clearInterval(maintenanceCheckInterval);
-                maintenanceCheckInterval = null;
-            }
         }
 
         // ============================================================
@@ -2187,17 +2133,6 @@
                 .subscribe();
         }
 
-        function stopBanMonitoring() {
-            if (banCheckInterval) {
-                clearInterval(banCheckInterval);
-                banCheckInterval = null;
-            }
-            if (banSubscription) {
-                try { db.removeChannel(banSubscription); } catch (_) {}
-                banSubscription = null;
-            }
-        }
-
         // ============================================================
         // 房间列表自动刷新（订阅）
         // ============================================================
@@ -2219,6 +2154,74 @@
                     }
                 })
                 .subscribe();
+        }
+
+        // ============================================================
+        // 路由：检查和切换房间
+        // ============================================================
+        async function checkAndSwitchRoom(roomName) {
+            const { data } = await db.from('messages')
+                .select('room')
+                .eq('room', roomName)
+                .limit(1);
+            if (data && data.length > 0) {
+                currentRoom = roomName;
+                loadRooms();
+                loadMessages(roomName, true);
+                subscribeToMessages();
+                subscribePrivateMessages();
+                subscribeCalls();
+                updateMemberList();
+                document.getElementById('chatRoomName').textContent = '🔒 ' + roomName;
+                document.querySelectorAll('.room-item').forEach(el => {
+                    el.classList.toggle('active', el.textContent.includes(roomName));
+                });
+            } else {
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="room-not-found">
+                        <div class="icon">🌌</div>
+                        <h2>房间不存在</h2>
+                        <p>房间 "${escapeHtml(roomName)}" 还没被创建</p>
+                        <button class="btn btn-primary" onclick="window.location.href='/starrychat/'">返回星迹</button>
+                    </div>
+                `;
+                document.getElementById('chatRoomName').textContent = '❓ 未找到';
+                loadRooms();
+                setTimeout(() => {
+                    if (currentRoom === '大厅') return;
+                    currentRoom = '大厅';
+                    document.getElementById('chatRoomName').textContent = '🏠 大厅';
+                }, 5000);
+            }
+        }
+
+        function logout() {
+            stopBanMonitoring();
+            stopMaintenanceMonitoring();
+            if (roomSubscription) {
+                try { db.removeChannel(roomSubscription); } catch (_) {}
+                roomSubscription = null;
+            }
+            hangUp();
+            currentUser = { username: '', avatar: '', signature: '' };
+            isAdmin = false;
+            localStorage.removeItem('starry_remember');
+            document.getElementById('chatApp').style.display = 'none';
+            document.getElementById('authPage').style.display = 'flex';
+            wsChannels.forEach(ch => { try { db.removeChannel(ch) } catch (_) {} });
+            wsChannels = [];
+            if (pc) { pc.close();
+                pc = null; }
+            if (localStream) { localStream.getTracks().forEach(t => t.stop());
+                localStream = null; }
+            document.getElementById('videoCallModal').classList.remove('active');
+            document.getElementById('videoCallModal').style.display = 'none';
+            document.getElementById('remoteVideo').srcObject = null;
+            document.getElementById('localVideo').srcObject = null;
+            currentPage = 0;
+            hasMoreMessages = true;
+            oldestMessageId = null;
+            oldestMessageCreatedAt = null;
         }
 
         // ============================================================
@@ -2262,7 +2265,6 @@
         }
 
         function switchRoom(room) {
-            // 更新URL（不刷新页面）
             if (room !== '大厅') {
                 const newUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') + '/' +
                 encodeURIComponent(room);
@@ -2294,7 +2296,6 @@
             document.getElementById('sidebar').classList.remove('show');
             updateMemberList();
 
-            // 输入框自动聚焦
             setTimeout(() => {
                 document.getElementById('messageInput').focus();
             }, 300);
@@ -2309,7 +2310,6 @@
                         true; });
                 if (!exists) {
                     roomOwners[roomName] = currentUser.username;
-                    // 插入系统消息占位，让房间立刻出现在列表
                     await db.from('messages').insert({
                         room: roomName,
                         username: '🛡️ 系统',
@@ -2332,7 +2332,6 @@
                         switchRoom(roomName);
                     };
                     document.getElementById('roomList').appendChild(div);
-                    // 更新URL
                     const newUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') + '/' +
                         encodeURIComponent(roomName);
                     window.history.pushState({ room: roomName }, '', newUrl);
@@ -2378,7 +2377,6 @@
                 document.getElementById('chatMessages').appendChild(trigger);
             }
 
-            // 显示加载动画
             const trigger = document.getElementById('loadMoreTrigger');
             if (trigger && reset) {
                 trigger.innerHTML = '<span class="loader loader-sm"></span> <span class="loading-text">加载中...</span>';
@@ -2417,7 +2415,6 @@
                 if (error) { console.error('加载消息失败', error);
                     isLoadingInitial = false; return; }
                 if (data && data.length > 0) {
-                    // 清除之前的骨架
                     document.querySelectorAll('.msg-skeleton').forEach(el => el.remove());
                     renderMessages(data);
                     if (data.length > 0) {
@@ -2433,7 +2430,6 @@
                         trigger.style.display = 'none';
                     }
                 } else {
-                    // 检查是否有更早消息
                     const { data: earlierCheck } = await db.from('messages')
                         .select('id')
                         .eq('room', room)
@@ -2546,11 +2542,13 @@
                 }
 
                 const { data, error } = await query;
-                if (error) { console.error('加载更早消息失败', error);
+                if (error) {
+                    console.error('加载更早消息失败', error);
                     isLoadingMore = false;
                     trigger.textContent = '⬆ 加载失败，点击重试';
                     trigger.className = 'load-more-trigger';
-                    return; }
+                    return;
+                }
 
                 if (data && data.length > 0) {
                     const sorted = data.reverse();
@@ -2591,11 +2589,9 @@
                 table: 'messages' }, payload => {
                 const msg = payload.new;
                 if (msg.room === currentRoom) {
-                    // 直接渲染新消息，不重新加载整个列表
                     renderMessage(msg);
                     if (msg.username !== currentUser.username) playSound();
                 }
-                // 更新房间列表（新房间出现）
                 if (msg.room && !currentRoomList.includes(msg.room)) {
                     currentRoomList.push(msg.room);
                     loadRooms();
@@ -2631,6 +2627,9 @@
             }
         }
 
+        // ============================================================
+        // 发送消息
+        // ============================================================
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
@@ -2718,7 +2717,6 @@
 
         function clearSearch() {
             document.getElementById('searchInput').value = '';
-            // 完整恢复消息列表
             document.getElementById('chatMessages').innerHTML = '';
             currentPage = 0;
             hasMoreMessages = true;
@@ -3050,19 +3048,16 @@
                 .target === overlay) { overlay.classList.remove('active');
                 overlay.style.display = 'none'; } }); });
 
-        // 浏览器后退/前进时切换房间
         window.addEventListener('popstate', function(event) {
             const room = event.state?.room;
             if (room && room !== currentRoom) {
                 if (room === '大厅') {
                     switchRoom('大厅');
                 } else {
-                    // 检查房间是否存在
                     db.from('messages').select('room').eq('room', room).limit(1).then(({ data }) => {
                         if (data && data.length > 0) {
                             switchRoom(room);
                         } else {
-                            // 房间不存在，回到大厅
                             const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '') +
                                 '/';
                             window.history.pushState({ room: '大厅' }, '', baseUrl);
