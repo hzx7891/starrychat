@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
     <style>
-        /* ===== 完整样式（精简且完整） ===== */
+        /* ===== 完整样式 ===== */
         * {
             margin: 0;
             padding: 0;
@@ -832,7 +832,6 @@
             background: transparent;
             font-family: var(--font);
             display: block;
-            /* 永远不隐藏 */
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -974,7 +973,6 @@
             transform: scale(1.02);
         }
 
-        /* ===== 消息操作按钮 ===== */
         .msg-actions {
             position: absolute;
             top: 4px;
@@ -1006,7 +1004,6 @@
             background: rgba(231, 76, 60, 0.8);
         }
 
-        /* ===== 输入区域 ===== */
         .input-area {
             display: flex;
             align-items: center;
@@ -1062,7 +1059,6 @@
             transform: scale(0.92);
         }
 
-        /* ===== 表情面板 ===== */
         #emojiPanel {
             display: none;
             padding: 12px 16px;
@@ -1092,7 +1088,6 @@
             transform: scale(1.2);
         }
 
-        /* ===== 移动端菜单 ===== */
         #menuToggle {
             display: none;
             position: fixed;
@@ -1223,7 +1218,6 @@
             }
         }
 
-        /* ===== 模态框 ===== */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -1294,7 +1288,6 @@
             min-width: 80px;
         }
 
-        /* ===== 视频通话 ===== */
         #videoCallModal {
             display: none;
             position: fixed;
@@ -1338,7 +1331,6 @@
             min-width: 100px;
         }
 
-        /* ===== 私聊 ===== */
         #privateChatContent .private-msgs {
             flex: 1;
             overflow-y: auto;
@@ -1651,6 +1643,13 @@
         // ============================================================
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
 
+        // 固定盐（与数据库中的密码哈希一致）
+        const FIXED_SALT = 'StarryChat_2024';
+
+        function hashPassword(password) {
+            return sha256(FIXED_SALT + password + FIXED_SALT);
+        }
+
         function UUID() {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
                 try { return crypto.randomUUID(); } catch (_) {}
@@ -1892,7 +1891,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（暴力修复：只查基础字段）
+        // 登录 / 注册（只查询实际存在的字段）
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1922,9 +1921,9 @@
             }
 
             try {
-                // ===== 暴力修复：只查这些基础字段，不依赖 salt/role =====
+                // ===== 只查询实际存在的字段 =====
                 const { data, error } = await db.from('users')
-                    .select('username, avatar, signature, is_banned, ban_reason, password_hash')
+                    .select('username, avatar, signature, is_banned, password_hash')
                     .eq('username', u)
                     .single();
 
@@ -1934,25 +1933,12 @@
                 }
 
                 if (data.is_banned) {
-                    const reason = prompt('⛔ 你的账号已被封禁。\n原因：' + (data.ban_reason || '未说明') +
-                        '\n\n输入申诉理由（选填），或点击取消退出：');
-                    if (reason !== null) {
-                        try {
-                            await db.from('appeals').insert({
-                                username: u,
-                                content: reason || '未填写理由',
-                                created_at: new Date().toISOString()
-                            });
-                            alert('✅ 申诉已提交，管理员会尽快处理。');
-                        } catch (e) { alert('申诉提交失败：' + e.message); }
-                    }
                     document.getElementById('loginError').innerText = '⛔ 账号已封禁';
                     return;
                 }
 
-                // 使用固定盐进行验证（兼容所有旧用户）
-                const fixedSalt = 'StarryChat_2024';
-                const hashedInput = sha256(fixedSalt + p + fixedSalt);
+                // 使用固定盐验证密码
+                const hashedInput = hashPassword(p);
 
                 if (hashedInput !== data.password_hash) {
                     document.getElementById('loginError').innerText = '用户名或密码错误';
@@ -1965,7 +1951,6 @@
                     signature: data.signature || ''
                 };
 
-                // 管理员判断（硬编码）
                 isAdmin = data.username === 'hzx7891';
 
                 // 记录登录日志
@@ -2019,8 +2004,7 @@
                 const { data: existing } = await db.from('users').select('username').eq('username', u).single();
                 if (existing) { document.getElementById('regError').innerText = '用户名已存在'; return; }
 
-                const fixedSalt = 'StarryChat_2024';
-                const hashedPassword = sha256(fixedSalt + p + fixedSalt);
+                const hashedPassword = hashPassword(p);
 
                 await db.from('users').insert({
                     username: u,
@@ -2050,7 +2034,7 @@
             if (savedToken) {
                 try {
                     const { data, error } = await db.from('users')
-                        .select('username, avatar, signature, remember_expires, is_banned, ban_reason, remember_device')
+                        .select('username, avatar, signature, remember_expires, is_banned, remember_device')
                         .eq('remember_token', savedToken)
                         .single();
                     if (data && !error && new Date(data.remember_expires) > new Date()) {
@@ -2064,7 +2048,7 @@
                         if (data.is_banned) {
                             localStorage.removeItem('starry_remember');
                             localStorage.removeItem('starry_device');
-                            alert('⛔ 该账号已被封禁\n原因：' + (data.ban_reason || '未说明'));
+                            alert('⛔ 该账号已被封禁');
                             document.getElementById('welcomePage').style.display = 'flex';
                             runTypeWriter();
                             return;
@@ -2095,7 +2079,7 @@
         }
 
         // ============================================================
-        // 主聊天逻辑（不变）
+        // 主聊天逻辑
         // ============================================================
         function enterChat() {
             stopBanMonitoring();
@@ -2175,11 +2159,11 @@
             banCheckInterval = setInterval(async () => {
                 try {
                     const { data } = await db.from('users')
-                        .select('is_banned, ban_reason')
+                        .select('is_banned')
                         .eq('username', currentUser.username)
                         .single();
                     if (data && data.is_banned) {
-                        alert('⛔ 你的账号已被封禁\n原因：' + (data.ban_reason || '未说明'));
+                        alert('⛔ 你的账号已被封禁');
                         logout();
                     }
                 } catch (_) {}
@@ -2193,7 +2177,7 @@
                     filter: 'username=eq.' + currentUser.username
                 }, payload => {
                     if (payload.new && payload.new.is_banned) {
-                        alert('⛔ 你的账号已被封禁\n原因：' + (payload.new.ban_reason || '未说明'));
+                        alert('⛔ 你的账号已被封禁');
                         logout();
                     }
                 })
