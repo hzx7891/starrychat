@@ -9,8 +9,9 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
+    <!-- ===== 样式表 ===== -->
     <style>
-        /* ===== 完整样式 ===== */
+        /* ===== 全局样式 ===== */
         * {
             margin: 0;
             padding: 0;
@@ -832,7 +833,7 @@
             background: transparent;
             font-family: var(--font);
             display: block;
-            /* 永远存在，不隐藏 */
+            /* 永远不隐藏 */
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -1800,7 +1801,14 @@
         // ============================================================
         function detectRoomFromURL() {
             const path = window.location.pathname;
-            const parts = path.split('/').filter(p => p && p !== 'starrychat');
+            // 移除可能存在的仓库名前缀
+            let cleanPath = path;
+            if (cleanPath.startsWith('/starrychat/')) {
+                cleanPath = cleanPath.replace('/starrychat/', '');
+            } else if (cleanPath.startsWith('/')) {
+                cleanPath = cleanPath.substring(1);
+            }
+            const parts = cleanPath.split('/').filter(p => p && p !== 'starrychat');
             if (parts.length > 0) {
                 const roomName = decodeURIComponent(parts[0]);
                 if (roomName && roomName !== 'index.html' && roomName !== '') {
@@ -2415,7 +2423,7 @@
         }
 
         // ============================================================
-        // 消息系统（事件委托 + 分页彻底修复）
+        // 消息系统（彻底修复：新消息直接追加到末尾）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2622,7 +2630,7 @@
             }
         });
 
-        // renderMessage：直接追加到容器末尾，不依赖 trigger
+        // ===== 核心修复：新消息直接追加到容器末尾，不依赖 trigger =====
         function renderMessage(msg) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
