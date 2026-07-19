@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
     <style>
-        /* ===== 全局样式（完整，含兼容） ===== */
+        /* ===== 完整样式 ===== */
         * {
             margin: 0;
             padding: 0;
@@ -831,7 +831,8 @@
             border: none;
             background: transparent;
             font-family: var(--font);
-            display: block;  /* 保证锚点存在 */
+            display: block;
+            /* 永远存在，不隐藏 */
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -2414,7 +2415,7 @@
         }
 
         // ============================================================
-        // 消息系统（事件委托 + 分页修复）
+        // 消息系统（事件委托 + 分页彻底修复）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2423,6 +2424,7 @@
                 oldestMessageId = null;
                 oldestMessageCreatedAt = null;
                 document.getElementById('chatMessages').innerHTML = '';
+                // 创建 loadMoreTrigger（始终存在）
                 const trigger = document.createElement('div');
                 trigger.className = 'load-more-trigger';
                 trigger.id = 'loadMoreTrigger';
@@ -2456,7 +2458,7 @@
                                 '<div class="text-muted text-center" style="padding:40px 0;">🔍 没有找到包含 "' +
                                 escapeHtml(searchKeyword) + '" 的消息</div>';
                         }
-                        // 搜索完不隐藏触发器，保留锚点
+                        // 搜索后保留 trigger 占位
                         if (trigger) {
                             trigger.textContent = '—— 已加载全部消息 ——';
                             trigger.className = 'load-more-trigger';
@@ -2478,13 +2480,13 @@
                     }
                 }
 
-                // ===== 分页逻辑修复 =====
+                // ===== 分页逻辑：永远不隐藏 trigger =====
                 if (data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
                     if (trigger) {
                         trigger.textContent = '—— 已加载全部消息 ——';
                         trigger.className = 'load-more-trigger';
-                        trigger.style.display = 'block';  // 保留占位
+                        trigger.style.display = 'block';
                     }
                 } else {
                     // 检查是否有更早消息
@@ -2525,7 +2527,7 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // 无onclick拼接，使用 data-* 属性
+        // 无 onclick 拼接
         function renderMessageToElement(div, msg) {
             const isSelf = msg.username === currentUser.username;
             const isSystem = msg.username === '🛡️ 系统';
@@ -2620,16 +2622,12 @@
             }
         });
 
+        // renderMessage：直接追加到容器末尾，不依赖 trigger
         function renderMessage(msg) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
             renderMessageToElement(div, msg);
-            const trigger = document.getElementById('loadMoreTrigger');
-            if (trigger) {
-                container.insertBefore(div, trigger);
-            } else {
-                container.appendChild(div);
-            }
+            container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
 
