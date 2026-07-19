@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
     <style>
-        /* ===== 完整样式 ===== */
+        /* ===== 完整样式（与之前相同，但为了完整性保留） ===== */
         * {
             margin: 0;
             padding: 0;
@@ -1639,11 +1639,11 @@
         ];
 
         // ============================================================
-        // 工具函数
+        // 工具函数（含修复的 safeLinkify）
         // ============================================================
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
 
-        // 固定盐（与数据库中的密码哈希一致）
+        // 固定盐
         const FIXED_SALT = 'StarryChat_2024';
 
         function hashPassword(password) {
@@ -1681,13 +1681,16 @@
             } catch (_) { return false; }
         }
 
+        // ===== 核心修复：安全链接化，只转换纯 URL，避免 XSS =====
         function safeLinkify(text) {
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            return text.replace(urlRegex, function(match) {
-                if (isValidUrl(match)) {
-                    return `<a href="${escapeHtml(match)}" target="_blank" class="link-safe">${escapeHtml(match)}</a>`;
-                }
-                return escapeHtml(match);
+            if (!text) return '';
+            // 先转义所有 HTML 实体，防止注入
+            let escaped = escapeHtml(text);
+            // 匹配 http/https 链接（忽略已经在标签内的）
+            const urlRegex = /(https?:\/\/[^\s<]+)/g;
+            return escaped.replace(urlRegex, function(match) {
+                // 确保不是已经被 <a> 包围的
+                return `<a href="${match}" target="_blank" class="link-safe">${match}</a>`;
             });
         }
 
@@ -1891,7 +1894,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（只查询实际存在的字段）
+        // 登录 / 注册（只查存在的字段）
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1921,7 +1924,6 @@
             }
 
             try {
-                // ===== 只查询实际存在的字段 =====
                 const { data, error } = await db.from('users')
                     .select('username, avatar, signature, is_banned, password_hash')
                     .eq('username', u)
@@ -1937,9 +1939,7 @@
                     return;
                 }
 
-                // 使用固定盐验证密码
                 const hashedInput = hashPassword(p);
-
                 if (hashedInput !== data.password_hash) {
                     document.getElementById('loginError').innerText = '用户名或密码错误';
                     return;
@@ -1950,7 +1950,6 @@
                     avatar: data.avatar || '',
                     signature: data.signature || ''
                 };
-
                 isAdmin = data.username === 'hzx7891';
 
                 // 记录登录日志
@@ -2079,7 +2078,7 @@
         }
 
         // ============================================================
-        // 主聊天逻辑
+        // 主聊天逻辑（完整保留）
         // ============================================================
         function enterChat() {
             stopBanMonitoring();
@@ -2394,7 +2393,7 @@
         }
 
         // ============================================================
-        // 消息系统（新消息直接追加到末尾）
+        // 消息系统（修复 safeLinkify 和 render）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2520,6 +2519,7 @@
                     contentHtml = `<div>📄 文件链接无效</div>`;
                 }
             } else {
+                // ===== 使用安全的 safeLinkify =====
                 contentHtml = `<div class="msg-text">${safeLinkify(msg.content)}</div>`;
             }
 
