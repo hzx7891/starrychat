@@ -9,8 +9,21 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
+    <!-- ===== SPA 路由修复：恢复 404.html 传入的路径 ===== -->
+    <script>
+        (function(l) {
+            if (l.search && l.search[1] === '/') {
+                var decoded = l.search.slice(1).split('&').map(function(s) {
+                    return s.replace(/~and~/g, '&');
+                }).join('?');
+                window.history.replaceState(null, null,
+                    l.pathname.slice(0, -1) + decoded + l.hash
+                );
+            }
+        }(window.location))
+    </script>
     <style>
-        /* ===== 完整样式（与之前相同，但为了完整性保留） ===== */
+        /* ===== 完整样式（与之前相同，为了完整性保留） ===== */
         * {
             margin: 0;
             padding: 0;
@@ -832,6 +845,7 @@
             background: transparent;
             font-family: var(--font);
             display: block;
+            /* 永远不隐藏 */
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -1639,7 +1653,7 @@
         ];
 
         // ============================================================
-        // 工具函数（含修复的 safeLinkify）
+        // 工具函数
         // ============================================================
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
 
@@ -1681,15 +1695,11 @@
             } catch (_) { return false; }
         }
 
-        // ===== 核心修复：安全链接化，只转换纯 URL，避免 XSS =====
         function safeLinkify(text) {
             if (!text) return '';
-            // 先转义所有 HTML 实体，防止注入
             let escaped = escapeHtml(text);
-            // 匹配 http/https 链接（忽略已经在标签内的）
             const urlRegex = /(https?:\/\/[^\s<]+)/g;
             return escaped.replace(urlRegex, function(match) {
-                // 确保不是已经被 <a> 包围的
                 return `<a href="${match}" target="_blank" class="link-safe">${match}</a>`;
             });
         }
@@ -1792,11 +1802,14 @@
         function detectRoomFromURL() {
             const path = window.location.pathname;
             let cleanPath = path;
+            // 移除可能的仓库名前缀
             if (cleanPath.startsWith('/starrychat/')) {
                 cleanPath = cleanPath.substring('/starrychat/'.length);
             } else if (cleanPath.startsWith('/')) {
                 cleanPath = cleanPath.substring(1);
             }
+            // 移除可能的尾部斜杠
+            cleanPath = cleanPath.replace(/\/$/, '');
             const parts = cleanPath.split('/').filter(p => p && p !== 'starrychat');
             if (parts.length > 0) {
                 const roomName = decodeURIComponent(parts[0]);
@@ -1894,7 +1907,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（只查存在的字段）
+        // 登录 / 注册（只查基础字段，兼容所有用户）
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1924,8 +1937,9 @@
             }
 
             try {
+                // 只查基础字段，不依赖 is_banned、remember_token 等
                 const { data, error } = await db.from('users')
-                    .select('username, avatar, signature, is_banned, password_hash')
+                    .select('username, avatar, signature, password_hash')
                     .eq('username', u)
                     .single();
 
@@ -1934,11 +1948,7 @@
                     return;
                 }
 
-                if (data.is_banned) {
-                    document.getElementById('loginError').innerText = '⛔ 账号已封禁';
-                    return;
-                }
-
+                // 验证密码
                 const hashedInput = hashPassword(p);
                 if (hashedInput !== data.password_hash) {
                     document.getElementById('loginError').innerText = '用户名或密码错误';
@@ -2033,21 +2043,13 @@
             if (savedToken) {
                 try {
                     const { data, error } = await db.from('users')
-                        .select('username, avatar, signature, remember_expires, is_banned, remember_device')
+                        .select('username, avatar, signature, remember_expires, remember_device')
                         .eq('remember_token', savedToken)
                         .single();
                     if (data && !error && new Date(data.remember_expires) > new Date()) {
                         if (data.remember_device && savedDevice && data.remember_device !== savedDevice) {
                             localStorage.removeItem('starry_remember');
                             localStorage.removeItem('starry_device');
-                            document.getElementById('welcomePage').style.display = 'flex';
-                            runTypeWriter();
-                            return;
-                        }
-                        if (data.is_banned) {
-                            localStorage.removeItem('starry_remember');
-                            localStorage.removeItem('starry_device');
-                            alert('⛔ 该账号已被封禁');
                             document.getElementById('welcomePage').style.display = 'flex';
                             runTypeWriter();
                             return;
@@ -2078,7 +2080,7 @@
         }
 
         // ============================================================
-        // 主聊天逻辑（完整保留）
+        // 主聊天逻辑
         // ============================================================
         function enterChat() {
             stopBanMonitoring();
@@ -2393,7 +2395,7 @@
         }
 
         // ============================================================
-        // 消息系统（修复 safeLinkify 和 render）
+        // 消息系统（修复：30条后新消息不渲染 + 加载更多）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2452,6 +2454,7 @@
                     }
                 }
 
+                // ===== 核心修复：永远保持 hasMoreMessages = true 直到确认没有更多 =====
                 if (data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
                     if (trigger) {
@@ -2460,6 +2463,7 @@
                         trigger.style.display = 'block';
                     }
                 } else {
+                    // 检查是否有更早消息
                     const { data: earlierCheck } = await db.from('messages')
                         .select('id')
                         .eq('room', room)
@@ -2519,7 +2523,6 @@
                     contentHtml = `<div>📄 文件链接无效</div>`;
                 }
             } else {
-                // ===== 使用安全的 safeLinkify =====
                 contentHtml = `<div class="msg-text">${safeLinkify(msg.content)}</div>`;
             }
 
@@ -2590,7 +2593,7 @@
             }
         });
 
-        // 核心修复：新消息直接追加到容器末尾
+        // ===== 核心修复：新消息直接追加到容器末尾，不依赖 trigger =====
         function renderMessage(msg) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
