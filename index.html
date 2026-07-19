@@ -9,9 +9,8 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
-    <!-- ===== 样式表 ===== -->
     <style>
-        /* ===== 全局样式 ===== */
+        /* ===== 完整样式（与之前一致，但精简） ===== */
         * {
             margin: 0;
             padding: 0;
@@ -138,39 +137,6 @@
             margin-left: 10px;
             color: var(--text-muted);
             font-size: 0.85rem;
-        }
-        .msg-skeleton {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 12px 18px;
-            max-width: 60%;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        .msg-skeleton .avatar-skel {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--bg-surface);
-            flex-shrink: 0;
-        }
-        .msg-skeleton .line {
-            height: 12px;
-            background: var(--bg-surface);
-            border-radius: var(--radius-full);
-            margin-bottom: 4px;
-        }
-        .msg-skeleton .line-short {
-            width: 60px;
-        }
-        .msg-skeleton .line-long {
-            width: 180px;
-        }
-        .msg-skeleton.self {
-            align-self: flex-end;
-        }
-        .msg-skeleton.other {
-            align-self: flex-start;
         }
 
         .btn {
@@ -833,7 +799,6 @@
             background: transparent;
             font-family: var(--font);
             display: block;
-            /* 永远不隐藏 */
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -975,7 +940,6 @@
             transform: scale(1.02);
         }
 
-        /* ===== 消息操作按钮 ===== */
         .msg-actions {
             position: absolute;
             top: 4px;
@@ -1007,7 +971,6 @@
             background: rgba(231, 76, 60, 0.8);
         }
 
-        /* ===== 输入区域 ===== */
         .input-area {
             display: flex;
             align-items: center;
@@ -1063,7 +1026,6 @@
             transform: scale(0.92);
         }
 
-        /* ===== 表情面板 ===== */
         #emojiPanel {
             display: none;
             padding: 12px 16px;
@@ -1093,7 +1055,6 @@
             transform: scale(1.2);
         }
 
-        /* ===== 移动端菜单 ===== */
         #menuToggle {
             display: none;
             position: fixed;
@@ -1224,7 +1185,6 @@
             }
         }
 
-        /* ===== 模态框 ===== */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -1295,7 +1255,6 @@
             min-width: 80px;
         }
 
-        /* ===== 视频通话 ===== */
         #videoCallModal {
             display: none;
             position: fixed;
@@ -1339,7 +1298,6 @@
             min-width: 100px;
         }
 
-        /* ===== 私聊 ===== */
         #privateChatContent .private-msgs {
             flex: 1;
             overflow-y: auto;
@@ -1628,9 +1586,7 @@
         const PAGE_SIZE = 30;
         let isLoadingMore = false;
         let hasMoreMessages = true;
-        let oldestMessageId = null;
         let oldestMessageCreatedAt = null;
-        let isLoadingInitial = false;
 
         // 封禁检查定时器
         let banCheckInterval = null;
@@ -1797,21 +1753,22 @@
         }
 
         // ============================================================
-        // 路由检测
+        // 路由检测（修复：取路径最后一段）
         // ============================================================
         function detectRoomFromURL() {
             const path = window.location.pathname;
-            // 移除可能存在的仓库名前缀
+            // 移除仓库名前缀（如果有）
             let cleanPath = path;
             if (cleanPath.startsWith('/starrychat/')) {
-                cleanPath = cleanPath.replace('/starrychat/', '');
+                cleanPath = cleanPath.substring('/starrychat/'.length);
             } else if (cleanPath.startsWith('/')) {
                 cleanPath = cleanPath.substring(1);
             }
+            // 如果还有斜杠，取第一部分
             const parts = cleanPath.split('/').filter(p => p && p !== 'starrychat');
             if (parts.length > 0) {
                 const roomName = decodeURIComponent(parts[0]);
-                if (roomName && roomName !== 'index.html' && roomName !== '') {
+                if (roomName && roomName !== 'index.html' && roomName !== '' && !roomName.includes('.')) {
                     return roomName;
                 }
             }
@@ -1905,7 +1862,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册
+        // 登录 / 注册（兼容字段缺失）
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1935,8 +1892,9 @@
             }
 
             try {
+                // 查询用户信息（兼容字段缺失）
                 const { data, error } = await db.from('users')
-                    .select('username, avatar, signature, salt, is_banned, ban_reason, role')
+                    .select('*')
                     .eq('username', u)
                     .single();
 
@@ -1962,6 +1920,7 @@
                     return;
                 }
 
+                // 兼容旧用户：如果 salt 不存在，使用默认盐
                 const salt = data.salt || 'StarryChat_2024';
                 const hashedInput = hashPassword(p, salt);
                 if (hashedInput !== data.password_hash) {
@@ -2060,7 +2019,7 @@
             if (savedToken) {
                 try {
                     const { data, error } = await db.from('users')
-                        .select('username, avatar, signature, remember_expires, is_banned, ban_reason, role, remember_device')
+                        .select('*')
                         .eq('remember_token', savedToken)
                         .single();
                     if (data && !error && new Date(data.remember_expires) > new Date()) {
@@ -2083,7 +2042,7 @@
                             username: data.username,
                             avatar: data.avatar || '',
                             signature: data.signature || '',
-                            salt: ''
+                            salt: data.salt || ''
                         };
                         isAdmin = data.role === 'admin' || data.username === 'hzx7891';
                         if (!currentUser.signature && !currentUser.avatar) {
@@ -2257,7 +2216,6 @@
             document.getElementById('localVideo').srcObject = null;
             currentPage = 0;
             hasMoreMessages = true;
-            oldestMessageId = null;
             oldestMessageCreatedAt = null;
         }
 
@@ -2333,7 +2291,6 @@
             document.getElementById('chatMessages').innerHTML = '';
             currentPage = 0;
             hasMoreMessages = true;
-            oldestMessageId = null;
             oldestMessageCreatedAt = null;
             const trigger = document.createElement('div');
             trigger.className = 'load-more-trigger';
@@ -2429,10 +2386,8 @@
             if (reset) {
                 currentPage = 0;
                 hasMoreMessages = true;
-                oldestMessageId = null;
                 oldestMessageCreatedAt = null;
                 document.getElementById('chatMessages').innerHTML = '';
-                // 创建 loadMoreTrigger（始终存在）
                 const trigger = document.createElement('div');
                 trigger.className = 'load-more-trigger';
                 trigger.id = 'loadMoreTrigger';
@@ -2466,7 +2421,6 @@
                                 '<div class="text-muted text-center" style="padding:40px 0;">🔍 没有找到包含 "' +
                                 escapeHtml(searchKeyword) + '" 的消息</div>';
                         }
-                        // 搜索后保留 trigger 占位
                         if (trigger) {
                             trigger.textContent = '—— 已加载全部消息 ——';
                             trigger.className = 'load-more-trigger';
@@ -2477,18 +2431,15 @@
                 }
 
                 const { data, error } = await query;
-                if (error) { console.error('加载消息失败', error);
-                    isLoadingInitial = false; return; }
+                if (error) { console.error('加载消息失败', error); return; }
                 if (data && data.length > 0) {
-                    document.querySelectorAll('.msg-skeleton').forEach(el => el.remove());
                     renderMessages(data);
                     if (data.length > 0) {
-                        oldestMessageId = data[0].id;
                         oldestMessageCreatedAt = data[0].created_at;
                     }
                 }
 
-                // ===== 分页逻辑：永远不隐藏 trigger =====
+                // 分页逻辑：永远不隐藏 trigger
                 if (data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
                     if (trigger) {
@@ -2497,7 +2448,6 @@
                         trigger.style.display = 'block';
                     }
                 } else {
-                    // 检查是否有更早消息
                     const { data: earlierCheck } = await db.from('messages')
                         .select('id')
                         .eq('room', room)
@@ -2521,7 +2471,6 @@
                 }
                 document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
             } catch (e) { console.error('加载消息异常', e); }
-            isLoadingInitial = false;
         }
 
         function renderMessages(messages) {
@@ -2535,7 +2484,6 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // 无 onclick 拼接
         function renderMessageToElement(div, msg) {
             const isSelf = msg.username === currentUser.username;
             const isSystem = msg.username === '🛡️ 系统';
@@ -2630,7 +2578,7 @@
             }
         });
 
-        // ===== 核心修复：新消息直接追加到容器末尾，不依赖 trigger =====
+        // ===== 核心修复：新消息直接追加到容器末尾 =====
         function renderMessage(msg) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
@@ -2668,7 +2616,6 @@
 
                 if (data && data.length > 0) {
                     const sorted = data.reverse();
-                    oldestMessageId = sorted[0].id;
                     oldestMessageCreatedAt = sorted[0].created_at;
                     const container = document.getElementById('chatMessages');
                     const triggerEl = document.getElementById('loadMoreTrigger');
@@ -2832,7 +2779,6 @@
             document.getElementById('chatMessages').innerHTML = '';
             currentPage = 0;
             hasMoreMessages = true;
-            oldestMessageId = null;
             oldestMessageCreatedAt = null;
             const trigger = document.createElement('div');
             trigger.className = 'load-more-trigger';
@@ -2937,8 +2883,7 @@
         // 个人资料
         // ============================================================
         async function showProfile(username) {
-            const { data } = await db.from('users').select('avatar, signature, is_banned, last_login_at, last_device, role')
-                .eq('username', username).single();
+            const { data } = await db.from('users').select('*').eq('username', username).single();
             if (data) {
                 const isBanned = data.is_banned || false;
                 const isUserAdmin = data.role === 'admin';
