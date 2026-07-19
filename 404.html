@@ -4,20 +4,14 @@
     <meta charset="UTF-8">
     <title>星迹 StarryChat</title>
     <script>
-        // SPA GitHub Pages 路由修复
-        // 将请求路径转为查询参数，重定向到 index.html
-        (function(l) {
-            if (l.search[1] === '/' ) {
-                var decoded = l.search.slice(1).split('&').map(function(s) {
-                    return s.replace(/~and~/g, '&');
-                }).join('?');
-                window.history.replaceState(null, null,
-                    l.pathname.slice(0, -1) + decoded + l.hash
-                );
-            }
-        }(window.location))
-        // 跳转到 index.html，保留路径
-        window.location.replace('/starrychat/' + '?/' + window.location.pathname.slice(1) + window.location.search);
+        // SPA 路由重定向：将路径转为查询参数，跳转到 index.html
+        (function() {
+            var path = window.location.pathname.slice(1); // 去掉开头的 /
+            var search = window.location.search;
+            // 构建目标 URL
+            var target = '/starrychat/?' + path + search;
+            window.location.replace(target);
+        })();
     </script>
 </head>
 <body>
