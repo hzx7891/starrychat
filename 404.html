@@ -1,40 +1,18 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>404 · 星迹</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0a0a1a;
-            color: #f0f0f5;
-            font-family: 'Inter', system-ui, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            text-align: center;
-            padding: 20px;
-        }
-        .container { max-width: 400px; }
-        .emoji { font-size: 4rem; margin-bottom: 16px; }
-        h1 { font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, #a29bfe, #55efc4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        p { color: #a8a8c8; margin: 16px 0 24px; }
-        .btn {
-            display: inline-block; padding: 12px 32px; border-radius: 999px;
-            background: linear-gradient(135deg, #6C5CE7, #00B894); color: #fff;
-            font-weight: 600; text-decoration: none; transition: all 0.3s;
-        }
-        .btn:hover { transform: translateY(-2px); opacity: 0.9; }
-    </style>
+    <meta charset="UTF-8">
+    <title>星迹 StarryChat</title>
+    <script>
+        // 保存当前路径到 sessionStorage
+        sessionStorage.setItem('redirect-path', window.location.pathname + window.location.search);
+        // 重定向到根路径
+        window.location.replace('/starrychat/');
+    </script>
 </head>
 <body>
-    <div class="container">
-        <div class="emoji">🌌</div>
-        <h1>404</h1>
-        <p>这颗星星有点远，找不到你去的房间</p>
-        <a href="/starrychat/" class="btn">返回星迹</a>
-    </div>
+    <!-- 如果 JavaScript 被禁用，显示备用内容 -->
+    <p>正在跳转...</p>
+    <a href="/starrychat/">点击这里</a>
 </body>
 </html>
