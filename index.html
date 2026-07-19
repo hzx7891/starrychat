@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
     <style>
-        /* ===== 完整样式（精简但完整） ===== */
+        /* ===== 完整样式（精简且完整） ===== */
         * {
             margin: 0;
             padding: 0;
@@ -1651,14 +1651,11 @@
         // ============================================================
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
 
-        // 密码哈希（兼容旧用户）
-        function hashPassword(password, salt) {
-            const effectiveSalt = salt || 'StarryChat_2024';
-            return sha256(effectiveSalt + password + effectiveSalt);
-        }
-
-        function generateSalt() {
-            return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        function UUID() {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                try { return crypto.randomUUID(); } catch (_) {}
+            }
+            return Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
         }
 
         function getDeviceFingerprint() {
@@ -1670,13 +1667,6 @@
                 navigator.hardwareConcurrency || ''
             ];
             return sha256(components.join('|')).substring(0, 16);
-        }
-
-        function UUID() {
-            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-                try { return crypto.randomUUID(); } catch (_) {}
-            }
-            return Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
         }
 
         function escapeHtml(text) {
@@ -1902,7 +1892,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（极简版，兼容任何表结构）
+        // 登录 / 注册（暴力修复：只查基础字段）
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1932,7 +1922,7 @@
             }
 
             try {
-                // 只查基础字段，不依赖 role 或 salt
+                // ===== 暴力修复：只查这些基础字段，不依赖 salt/role =====
                 const { data, error } = await db.from('users')
                     .select('username, avatar, signature, is_banned, ban_reason, password_hash')
                     .eq('username', u)
@@ -1960,21 +1950,10 @@
                     return;
                 }
 
-                // 尝试获取 salt（如果字段存在）
-                let salt = 'StarryChat_2024';
-                try {
-                    const { data: saltData } = await db.from('users')
-                        .select('salt')
-                        .eq('username', u)
-                        .single();
-                    if (saltData && saltData.salt) {
-                        salt = saltData.salt;
-                    }
-                } catch (_) {
-                    // 字段不存在，使用默认盐
-                }
+                // 使用固定盐进行验证（兼容所有旧用户）
+                const fixedSalt = 'StarryChat_2024';
+                const hashedInput = sha256(fixedSalt + p + fixedSalt);
 
-                const hashedInput = hashPassword(p, salt);
                 if (hashedInput !== data.password_hash) {
                     document.getElementById('loginError').innerText = '用户名或密码错误';
                     return;
@@ -1986,16 +1965,8 @@
                     signature: data.signature || ''
                 };
 
-                // 尝试获取 role（如果字段存在）
-                try {
-                    const { data: roleData } = await db.from('users')
-                        .select('role')
-                        .eq('username', u)
-                        .single();
-                    isAdmin = roleData?.role === 'admin' || data.username === 'hzx7891';
-                } catch (_) {
-                    isAdmin = data.username === 'hzx7891';
-                }
+                // 管理员判断（硬编码）
+                isAdmin = data.username === 'hzx7891';
 
                 // 记录登录日志
                 try {
@@ -2048,24 +2019,16 @@
                 const { data: existing } = await db.from('users').select('username').eq('username', u).single();
                 if (existing) { document.getElementById('regError').innerText = '用户名已存在'; return; }
 
-                const salt = generateSalt();
-                const hashedPassword = hashPassword(p, salt);
+                const fixedSalt = 'StarryChat_2024';
+                const hashedPassword = sha256(fixedSalt + p + fixedSalt);
 
-                // 尝试插入包括 salt 和 role（如果字段存在）
-                const insertData = {
+                await db.from('users').insert({
                     username: u,
                     password_hash: hashedPassword,
                     avatar: '',
                     signature: '',
                     is_banned: false
-                };
-                // 尝试添加 salt 和 role（如果表中有这些字段）
-                try {
-                    await db.from('users').insert({ ...insertData, salt: salt, role: 'user' });
-                } catch (_) {
-                    // 如果字段不存在，只插入基础字段
-                    await db.from('users').insert(insertData);
-                }
+                });
                 alert('🎉 注册成功！请登录');
                 showLogin();
                 document.getElementById('loginUser').value = u;
@@ -2111,16 +2074,7 @@
                             avatar: data.avatar || '',
                             signature: data.signature || ''
                         };
-                        // 尝试获取 role
-                        try {
-                            const { data: roleData } = await db.from('users')
-                                .select('role')
-                                .eq('username', data.username)
-                                .single();
-                            isAdmin = roleData?.role === 'admin' || data.username === 'hzx7891';
-                        } catch (_) {
-                            isAdmin = data.username === 'hzx7891';
-                        }
+                        isAdmin = data.username === 'hzx7891';
                         if (!currentUser.signature && !currentUser.avatar) {
                             showSignaturePage();
                             return;
@@ -2141,7 +2095,7 @@
         }
 
         // ============================================================
-        // 主聊天逻辑
+        // 主聊天逻辑（不变）
         // ============================================================
         function enterChat() {
             stopBanMonitoring();
