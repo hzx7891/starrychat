@@ -1,21 +1,813 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>星迹 StarryChat</title>
-    <script>
-        // SPA 路由重定向：将路径转为查询参数，跳转到 index.html
-        (function() {
-            var path = window.location.pathname.slice(1); // 去掉开头的 /
-            var search = window.location.search;
-            // 构建目标 URL
-            var target = '/starrychat/?' + path + search;
-            window.location.replace(target);
-        })();
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 · 星迹 StarryChat</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C5CE7'/%3E%3Cstop offset='100%25' stop-color='%2300B894'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='48' fill='url(%23g)'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle' fill='white' font-family='system-ui'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
+    <style>
+        /* ========== CSS Variables & Reset ========== */
+        :root {
+            --bg: #0a0e14;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #6C5CE7;
+            --accent2: #00B894;
+            --accent-glow: rgba(108, 92, 231, 0.35);
+            --border: #21262d;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+            --star-count: 200;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ========== Stars Background ========== */
+        #stars-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .star {
+            position: absolute;
+            border-radius: 50%;
+            background: #ffffff;
+            animation: twinkle var(--duration, 2s) ease-in-out infinite alternate;
+            animation-delay: var(--delay, 0s);
+            will-change: transform, opacity;
+        }
+
+        @keyframes twinkle {
+            0% {
+                opacity: var(--min-opacity, 0.2);
+                transform: scale(0.8);
+            }
+            100% {
+                opacity: var(--max-opacity, 1);
+                transform: scale(1.2);
+            }
+        }
+
+        /* Shooting star */
+        .shooting-star {
+            position: fixed;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0;
+            box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.3);
+        }
+        .shooting-star::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 0;
+            width: 80px;
+            height: 1.5px;
+            background: linear-gradient(to left, rgba(255, 255, 255, 0.6), transparent);
+            transform: translateY(-50%);
+            border-radius: 2px;
+        }
+        .shooting-star.active {
+            animation: shoot 1.2s ease-out forwards;
+        }
+        @keyframes shoot {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            70% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx, -300px), var(--ty, 300px)) scale(0.3);
+            }
+        }
+
+        /* ========== Content Layer ========== */
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 40px 24px;
+            max-width: 640px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* ========== 3D Planet Illustration ========== */
+        .illustration {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            margin: 0 auto 28px;
+            perspective: 600px;
+        }
+
+        /* Planet body */
+        .planet {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 72px;
+            height: 72px;
+            margin: -36px 0 0 -36px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #a78bfa, var(--accent) 50%, #4a1a8a 90%);
+            box-shadow:
+                0 0 40px var(--accent-glow),
+                inset -12px -12px 30px rgba(0, 0, 0, 0.5),
+                inset 8px 8px 20px rgba(255, 255, 255, 0.15);
+            transform: rotateX(10deg) rotateY(-20deg);
+            transition: transform 0.3s ease;
+            will-change: transform;
+        }
+        /* Planet ring / atmosphere glow */
+        .planet::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: -12px;
+            right: -12px;
+            bottom: -12px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 25%, rgba(167, 139, 250, 0.25), transparent 70%);
+            filter: blur(6px);
+            animation: pulseGlow 3s ease-in-out infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.6;
+            }
+            100% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+        /* Planet surface detail (crater-like) */
+        .planet::after {
+            content: '';
+            position: absolute;
+            top: 18%;
+            left: 22%;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.2);
+            box-shadow:
+                22px 28px 0 -4px rgba(0, 0, 0, 0.15),
+                -10px 36px 0 -2px rgba(0, 0, 0, 0.12),
+                8px -12px 0 -3px rgba(0, 0, 0, 0.10);
+        }
+
+        /* Orbit ring */
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 120px;
+            height: 70px;
+            margin: -35px 0 0 -60px;
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+            transform: rotateX(65deg) rotateZ(-15deg);
+            pointer-events: none;
+        }
+        .orbit::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            border: 1px solid transparent;
+            border-top-color: rgba(108, 92, 231, 0.15);
+            border-right-color: rgba(0, 184, 148, 0.10);
+            animation: orbitSpin 8s linear infinite;
+        }
+        @keyframes orbitSpin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Satellite */
+        .satellite {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            margin: -4px 0 0 -4px;
+            background: radial-gradient(circle at 40% 35%, #f0f0ff, #b0b0d0);
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+            animation: satelliteOrbit 6s linear infinite;
+            will-change: transform;
+        }
+        @keyframes satelliteOrbit {
+            from {
+                transform: rotate(0deg) translateX(60px) rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg) translateX(60px) rotate(-360deg);
+            }
+        }
+
+        /* Small floating asteroids (decorative) */
+        .asteroid {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+            animation: floatAsteroid 12s ease-in-out infinite alternate;
+        }
+        .asteroid:nth-child(1) {
+            width: 10px;
+            height: 8px;
+            top: 10%;
+            left: 2%;
+            animation-duration: 14s;
+        }
+        .asteroid:nth-child(2) {
+            width: 6px;
+            height: 6px;
+            bottom: 12%;
+            right: 0%;
+            animation-duration: 10s;
+            animation-delay: -3s;
+        }
+        .asteroid:nth-child(3) {
+            width: 12px;
+            height: 10px;
+            top: 60%;
+            left: -6%;
+            animation-duration: 18s;
+            animation-delay: -6s;
+            border-radius: 40% 60% 50% 50%;
+        }
+        @keyframes floatAsteroid {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            100% {
+                transform: translate(8px, -12px) rotate(25deg);
+            }
+        }
+
+        /* ========== Typography ========== */
+        .error-code {
+            font-size: 5.5rem;
+            font-weight: 800;
+            letter-spacing: -3px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2), #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 6px;
+            filter: drop-shadow(0 4px 20px rgba(108, 92, 231, 0.25));
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.7;
+            margin-bottom: 32px;
+            max-width: 420px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ========== Buttons ========== */
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 28px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: var(--border);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            min-height: 48px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn:hover {
+            background: #30363d;
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(0px) scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+        .btn-primary:hover {
+            opacity: 0.92;
+            box-shadow: 0 6px 28px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+        .btn-primary:active {
+            transform: translateY(0px) scale(0.97);
+        }
+
+        /* subtle shine on primary button */
+        .btn-primary::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1), transparent 60%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .btn-primary:hover::after {
+            opacity: 1;
+        }
+
+        /* ========== Redirect Hint ========== */
+        .redirect-hint {
+            margin-top: 24px;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            opacity: 0.7;
+            transition: opacity 0.3s ease;
+            letter-spacing: 0.2px;
+        }
+        .redirect-hint .countdown {
+            font-weight: 600;
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 0 8px;
+            border-radius: 4px;
+        }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 520px) {
+            .error-code {
+                font-size: 3.8rem;
+            }
+            h1 {
+                font-size: 1.3rem;
+            }
+            .description {
+                font-size: 0.85rem;
+                padding: 0 4px;
+            }
+            .btn {
+                padding: 9px 20px;
+                font-size: 0.85rem;
+                min-height: 42px;
+                flex: 1 0 auto;
+                max-width: 200px;
+            }
+            .illustration {
+                width: 110px;
+                height: 110px;
+            }
+            .planet {
+                width: 56px;
+                height: 56px;
+                margin: -28px 0 0 -28px;
+            }
+            .orbit {
+                width: 96px;
+                height: 56px;
+                margin: -28px 0 0 -48px;
+            }
+            .satellite {
+                width: 6px;
+                height: 6px;
+                margin: -3px 0 0 -3px;
+            }
+            @keyframes satelliteOrbit {
+                from {
+                    transform: rotate(0deg) translateX(48px) rotate(0deg);
+                }
+                to {
+                    transform: rotate(360deg) translateX(48px) rotate(-360deg);
+                }
+            }
+            .asteroid {
+                display: none;
+            }
+            .redirect-hint {
+                font-size: 0.75rem;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .error-code {
+                font-size: 3rem;
+            }
+            .illustration {
+                width: 90px;
+                height: 90px;
+            }
+            .planet {
+                width: 44px;
+                height: 44px;
+                margin: -22px 0 0 -22px;
+            }
+            .orbit {
+                width: 78px;
+                height: 44px;
+                margin: -22px 0 0 -39px;
+            }
+            @keyframes satelliteOrbit {
+                from {
+                    transform: rotate(0deg) translateX(40px) rotate(0deg);
+                }
+                to {
+                    transform: rotate(360deg) translateX(40px) rotate(-360deg);
+                }
+            }
+            .btn {
+                font-size: 0.8rem;
+                padding: 8px 16px;
+                min-height: 38px;
+            }
+        }
+
+        /* ========== Reduced Motion ========== */
+        @media (prefers-reduced-motion: reduce) {
+            .star,
+            .shooting-star,
+            .satellite,
+            .orbit::before,
+            .planet::before,
+            .asteroid {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .container {
+                animation: none !important;
+            }
+            .btn {
+                transition: none !important;
+            }
+        }
+
+        /* ========== Scrollbar (optional) ========== */
+        ::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+    </style>
 </head>
 <body>
-    <p>正在跳转...</p>
-    <a href="/starrychat/">点击这里</a>
+
+    <!-- ====== Stars Container (JS fills this) ====== -->
+    <div id="stars-container" role="presentation" aria-hidden="true"></div>
+
+    <!-- ====== Main Content ====== -->
+    <main class="container" role="main">
+        <!-- Illustration -->
+        <div class="illustration" aria-hidden="true">
+            <div class="planet"></div>
+            <div class="orbit"></div>
+            <div class="satellite"></div>
+            <div class="asteroid"></div>
+            <div class="asteroid"></div>
+            <div class="asteroid"></div>
+        </div>
+
+        <!-- Error Info -->
+        <div class="error-code" aria-label="404">404</div>
+        <h1>页面未找到</h1>
+        <p class="description">
+            你寻找的页面可能已被移除、重命名，<br>或暂时不可用。
+        </p>
+
+        <!-- Buttons -->
+        <div class="btn-group">
+            <a href="/starrychat/" class="btn btn-primary" id="homeBtn">
+                <span>←</span> 返回星迹
+            </a>
+        </div>
+
+        <!-- Redirect hint -->
+        <p class="redirect-hint" id="redirectHint" aria-live="polite">
+            正在自动跳转中… <span class="countdown" id="countdownNum">3</span> 秒
+        </p>
+    </main>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ============================================================
+            //  1.  BUG FIX: 统一跳转逻辑
+            //      - 按钮 href 与脚本目标一致
+            //      - 保留 path + search + hash
+            //      - 处理空查询参数
+            // ============================================================
+            function buildRedirectUrl() {
+                var path = window.location.pathname.slice(1) || '';
+                var search = window.location.search || '';
+                var hash = window.location.hash || '';
+                // 如果有 path，则作为查询参数传递；否则不加 '?'
+                var query = path ? '?path=' + encodeURIComponent(path) : '';
+                // 如果原本有 search，合并
+                if (search) {
+                    query += (query ? '&' : '?') + search.slice(1);
+                }
+                return '/starrychat/' + query + hash;
+            }
+
+            var targetUrl = buildRedirectUrl();
+
+            // 更新按钮 href（与脚本跳转一致）
+            var homeBtn = document.getElementById('homeBtn');
+            if (homeBtn) {
+                homeBtn.setAttribute('href', targetUrl);
+            }
+
+            // ============================================================
+            //  2.  倒计时 & 自动跳转（带错误回退）
+            // ============================================================
+            var hint = document.getElementById('redirectHint');
+            var countdownEl = document.getElementById('countdownNum');
+            var countdown = 5;
+
+            var timer = setInterval(function() {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    if (countdownEl) countdownEl.textContent = '0';
+                    if (hint) hint.textContent = '正在跳转…';
+                    try {
+                        window.location.replace(targetUrl);
+                    } catch (_) {
+                        // 降级方案：使用 href
+                        window.location.href = targetUrl;
+                    }
+                } else {
+                    if (countdownEl) countdownEl.textContent = countdown;
+                }
+            }, 1000);
+
+            // 如果用户点击按钮，取消自动跳转（避免竞争）
+            if (homeBtn) {
+                homeBtn.addEventListener('click', function(e) {
+                    clearInterval(timer);
+                });
+            }
+
+            // ============================================================
+            //  3.  生成星空背景 (DOM 星星)
+            // ============================================================
+            function createStars() {
+                var container = document.getElementById('stars-container');
+                if (!container) return;
+
+                // 根据屏幕宽度调整星星数量
+                var isMobile = window.innerWidth < 520;
+                var count = isMobile ? 100 : 200;
+                var fragment = document.createDocumentFragment();
+
+                for (var i = 0; i < count; i++) {
+                    var star = document.createElement('div');
+                    star.className = 'star';
+
+                    var size = 1 + Math.random() * 2.5;
+                    var x = Math.random() * 100;
+                    var y = Math.random() * 100;
+                    var minOp = 0.15 + Math.random() * 0.25;
+                    var maxOp = 0.5 + Math.random() * 0.5;
+                    var duration = 1.5 + Math.random() * 3;
+                    var delay = Math.random() * 5;
+
+                    star.style.cssText =
+                        'width:' + size + 'px;' +
+                        'height:' + size + 'px;' +
+                        'left:' + x + '%;' +
+                        'top:' + y + '%;' +
+                        '--min-opacity:' + minOp + ';' +
+                        '--max-opacity:' + maxOp + ';' +
+                        '--duration:' + duration + 's;' +
+                        '--delay:' + delay + 's;';
+
+                    fragment.appendChild(star);
+                }
+
+                container.appendChild(fragment);
+            }
+
+            createStars();
+
+            // ============================================================
+            //  4.  鼠标视差效果 (星星跟随鼠标微动)
+            // ============================================================
+            (function parallax() {
+                var stars = document.querySelectorAll('.star');
+                var container = document.getElementById('stars-container');
+                if (!stars.length || !container) return;
+
+                var centerX = window.innerWidth / 2;
+                var centerY = window.innerHeight / 2;
+                var maxOffset = 13; // 最大偏移像素
+
+                function onMouseMove(e) {
+                    var mouseX = e.clientX || centerX;
+                    var mouseY = e.clientY || centerY;
+                    var offsetX = ((mouseX - centerX) / centerX) * maxOffset;
+                    var offsetY = ((mouseY - centerY) / centerY) * maxOffset;
+
+                    // 使用 transform 整体移动星星层，性能更好
+                    container.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
+                    container.style.transition = 'transform 0.15s ease-out';
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                // 触摸设备上不启用视差（避免干扰）
+                if ('ontouchstart' in window) {
+                    document.removeEventListener('mousemove', onMouseMove);
+                }
+            })();
+
+            // ============================================================
+            //  5.  流星效果 (随机出现)
+            // ============================================================
+            (function shootingStars() {
+                var body = document.body;
+                var isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if (isReducedMotion) return;
+
+                function createShootingStar() {
+                    var star = document.createElement('div');
+                    star.className = 'shooting-star';
+
+                    // 随机起始位置 (右上区域)
+                    var startX = 60 + Math.random() * 35;
+                    var startY = 5 + Math.random() * 25;
+                    // 飞行方向 (向右下)
+                    var distance = 200 + Math.random() * 250;
+                    var angle = 35 + Math.random() * 25; // 度
+                    var rad = angle * Math.PI / 180;
+                    var tx = -Math.cos(rad) * distance;
+                    var ty = Math.sin(rad) * distance;
+
+                    star.style.cssText =
+                        'left:' + startX + '%;' +
+                        'top:' + startY + '%;' +
+                        '--tx:' + tx + 'px;' +
+                        '--ty:' + ty + 'px;';
+
+                    body.appendChild(star);
+
+                    // 触发动画
+                    requestAnimationFrame(function() {
+                        star.classList.add('active');
+                    });
+
+                    // 动画结束后移除
+                    setTimeout(function() {
+                        if (star.parentNode) star.parentNode.removeChild(star);
+                    }, 1400);
+                }
+
+                // 随机生成流星，间隔 4~12 秒
+                function scheduleNext() {
+                    var delay = 3000 + Math.random() * 7000;
+                    setTimeout(function() {
+                        createShootingStar();
+                        scheduleNext();
+                    }, delay);
+                }
+
+                // 首颗流星延迟 2~5 秒出现
+                setTimeout(function() {
+                    createShootingStar();
+                    scheduleNext();
+                }, 2000 + Math.random() * 3000);
+            })();
+
+            // ============================================================
+            //  6.  窗口 resize 时重新调整星星数量（防抖）
+            // ============================================================
+            var resizeTimer = null;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function() {
+                    var container = document.getElementById('stars-container');
+                    if (!container) return;
+                    var isMobile = window.innerWidth < 520;
+                    var targetCount = isMobile ? 100 : 200;
+                    var currentStars = container.querySelectorAll('.star');
+                    if (currentStars.length === targetCount) return;
+
+                    // 简单重建
+                    while (container.firstChild) {
+                        container.removeChild(container.firstChild);
+                    }
+                    // 重新生成星星 (复用 createStars 逻辑)
+                    var count = targetCount;
+                    var fragment = document.createDocumentFragment();
+                    for (var i = 0; i < count; i++) {
+                        var star = document.createElement('div');
+                        star.className = 'star';
+                        var size = 1 + Math.random() * 2.5;
+                        var x = Math.random() * 100;
+                        var y = Math.random() * 100;
+                        var minOp = 0.15 + Math.random() * 0.25;
+                        var maxOp = 0.5 + Math.random() * 0.5;
+                        var duration = 1.5 + Math.random() * 3;
+                        var delay = Math.random() * 5;
+                        star.style.cssText =
+                            'width:' + size + 'px;' +
+                            'height:' + size + 'px;' +
+                            'left:' + x + '%;' +
+                            'top:' + y + '%;' +
+                            '--min-opacity:' + minOp + ';' +
+                            '--max-opacity:' + maxOp + ';' +
+                            '--duration:' + duration + 's;' +
+                            '--delay:' + delay + 's;';
+                        fragment.appendChild(star);
+                    }
+                    container.appendChild(fragment);
+                }, 500);
+            });
+
+            // ============================================================
+            //  7.  可访问性: 倒计时更新时 aria-live 已存在
+            //     键盘支持: 按钮本身可聚焦，通过 tab 访问
+            // ============================================================
+
+        })();
+    </script>
 </body>
 </html>
