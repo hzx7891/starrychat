@@ -9,19 +9,6 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
     </script>
-    <!-- ===== SPA 路由修复：恢复 404.html 传入的路径 ===== -->
-    <script>
-        (function(l) {
-            if (l.search && l.search[1] === '/') {
-                var decoded = l.search.slice(1).split('&').map(function(s) {
-                    return s.replace(/~and~/g, '&');
-                }).join('?');
-                window.history.replaceState(null, null,
-                    l.pathname.slice(0, -1) + decoded + l.hash
-                );
-            }
-        }(window.location))
-    </script>
     <style>
         /* ===== 完整样式（已精简，只保留核心布局） ===== */
         * {
@@ -630,6 +617,7 @@
             border: none;
             background: transparent;
             display: block;
+            /* 永远不隐藏 */;
         }
         .load-more-trigger:hover {
             color: var(--text-primary);
@@ -1381,14 +1369,14 @@
         // 固定盐
         const FIXED_SALT = 'StarryChat_2024';
 
-        // 密码验证（兼容两种模式）
+        // 密码验证（兼容三种方式）
         function verifyPassword(inputPassword, storedHash) {
-            // 方法1：使用固定盐
-            var hash1 = sha256(FIXED_SALT + inputPassword + FIXED_SALT);
-            if (hash1 === storedHash) return true;
-            // 方法2：无盐（兼容旧用户）
-            var hash2 = sha256(inputPassword);
-            if (hash2 === storedHash) return true;
+            // 方式1：固定盐
+            if (sha256(FIXED_SALT + inputPassword + FIXED_SALT) === storedHash) return true;
+            // 方式2：无盐
+            if (sha256(inputPassword) === storedHash) return true;
+            // 方式3：空盐（可能有些旧数据用空字符串）
+            if (sha256('' + inputPassword + '') === storedHash) return true;
             return false;
         }
 
@@ -1529,22 +1517,42 @@
         }
 
         // ============================================================
-        // 路由检测
+        // 路由检测（支持查询参数中的 path）
         // ============================================================
         function detectRoomFromURL() {
-            const path = window.location.pathname;
-            let cleanPath = path;
+            // 优先从 location.search 中解析 path 参数（由 404.html 重定向带来）
+            var searchParams = new URLSearchParams(location.search);
+            var path = searchParams.get('path') || '';
+            // 如果 path 参数存在，从中提取房间名
+            if (path) {
+                // 去掉开头的斜杠
+                path = path.replace(/^\//, '');
+                // 去掉可能的 /starrychat/ 前缀
+                if (path.startsWith('starrychat/')) {
+                    path = path.substring('starrychat/'.length);
+                }
+                var parts = path.split('/').filter(p => p);
+                if (parts.length > 0) {
+                    var roomName = decodeURIComponent(parts[0]);
+                    if (roomName && roomName !== 'index.html' && roomName !== '' && !roomName.includes('.')) {
+                        return roomName;
+                    }
+                }
+            }
+            // 否则从 pathname 中解析
+            var pathname = window.location.pathname;
+            var cleanPath = pathname;
             if (cleanPath.startsWith('/starrychat/')) {
                 cleanPath = cleanPath.substring('/starrychat/'.length);
             } else if (cleanPath.startsWith('/')) {
                 cleanPath = cleanPath.substring(1);
             }
             cleanPath = cleanPath.replace(/\/$/, '');
-            const parts = cleanPath.split('/').filter(p => p && p !== 'starrychat');
-            if (parts.length > 0) {
-                const roomName = decodeURIComponent(parts[0]);
-                if (roomName && roomName !== 'index.html' && roomName !== '' && !roomName.includes('.')) {
-                    return roomName;
+            var parts2 = cleanPath.split('/').filter(p => p && p !== 'starrychat');
+            if (parts2.length > 0) {
+                var roomName2 = decodeURIComponent(parts2[0]);
+                if (roomName2 && roomName2 !== 'index.html' && roomName2 !== '' && !roomName2.includes('.')) {
+                    return roomName2;
                 }
             }
             return null;
@@ -1637,7 +1645,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（兼容多种密码哈希）
+        // 登录 / 注册
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none';
             document.getElementById('regBox').style.display = 'block'; }
@@ -1667,7 +1675,6 @@
             }
 
             try {
-                // 查询用户信息
                 const { data, error } = await db.from('users')
                     .select('username, avatar, signature, password_hash')
                     .eq('username', u)
@@ -1678,7 +1685,6 @@
                     return;
                 }
 
-                // 验证密码（兼容多种哈希）
                 if (!verifyPassword(p, data.password_hash)) {
                     document.getElementById('loginError').innerText = '用户名或密码错误';
                     return;
@@ -1691,7 +1697,6 @@
                 };
                 isAdmin = data.username === 'hzx7891';
 
-                // 记录登录日志
                 try {
                     const deviceInfo = navigator.userAgent || '未知设备';
                     await db.from('login_logs').insert({ username: u, device: deviceInfo, created_at: new Date()
@@ -1862,13 +1867,11 @@
         // 房间切换（路由核心）
         // ============================================================
         async function checkAndSwitchRoom(roomName) {
-            // 检查房间是否存在（通过 messages 表）
             const { data } = await db.from('messages')
                 .select('room')
                 .eq('room', roomName)
                 .limit(1);
             if (data && data.length > 0) {
-                // 房间存在，切换
                 currentRoom = roomName;
                 loadRooms();
                 loadMessages(roomName, true);
@@ -1877,18 +1880,15 @@
                 subscribeCalls();
                 updateMemberList();
                 document.getElementById('chatRoomName').textContent = '🔒 ' + roomName;
-                // 高亮房间
                 document.querySelectorAll('.room-item').forEach(el => {
                     el.classList.toggle('active', el.textContent.includes(roomName));
                 });
-                // 更新 URL
                 const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
                 if (!window.location.pathname.includes(roomName)) {
                     window.history.pushState({ room: roomName }, '', window.location.origin + basePath + '/' +
                         encodeURIComponent(roomName));
                 }
             } else {
-                // 房间不存在，显示 404 提示
                 document.getElementById('chatMessages').innerHTML = `
                     <div class="room-not-found">
                         <div class="icon">🌌</div>
@@ -1899,7 +1899,6 @@
                 `;
                 document.getElementById('chatRoomName').textContent = '❓ 未找到';
                 loadRooms();
-                // 3秒后自动跳回大厅
                 setTimeout(() => {
                     if (currentRoom === '大厅') return;
                     window.location.href = '/starrychat/';
@@ -2173,7 +2172,7 @@
         }
 
         // ============================================================
-        // 消息系统（30条后新消息直接追加到末尾）
+        // 消息系统（新消息直接追加到末尾）
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -2232,7 +2231,6 @@
                     }
                 }
 
-                // 分页状态更新
                 if (data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
                     if (trigger) {
@@ -2965,6 +2963,17 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             autoLogin();
+            // 检查路由参数
+            var room = detectRoomFromURL();
+            if (room && room !== '大厅') {
+                // 如果还没有登录，等登录后处理
+                var checkUser = setInterval(function() {
+                    if (currentUser.username) {
+                        clearInterval(checkUser);
+                        checkAndSwitchRoom(room);
+                    }
+                }, 500);
+            }
         });
     </script>
 </body>
