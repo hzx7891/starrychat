@@ -1523,11 +1523,8 @@
             // 优先从 location.search 中解析 path 参数（由 404.html 重定向带来）
             var searchParams = new URLSearchParams(location.search);
             var path = searchParams.get('path') || '';
-            // 如果 path 参数存在，从中提取房间名
             if (path) {
-                // 去掉开头的斜杠
                 path = path.replace(/^\//, '');
-                // 去掉可能的 /starrychat/ 前缀
                 if (path.startsWith('starrychat/')) {
                     path = path.substring('starrychat/'.length);
                 }
@@ -1539,7 +1536,6 @@
                     }
                 }
             }
-            // 否则从 pathname 中解析
             var pathname = window.location.pathname;
             var cleanPath = pathname;
             if (cleanPath.startsWith('/starrychat/')) {
@@ -1675,13 +1671,20 @@
             }
 
             try {
+                // ===== 修改：查询 is_banned 和 ban_reason =====
                 const { data, error } = await db.from('users')
-                    .select('username, avatar, signature, password_hash')
+                    .select('username, avatar, signature, password_hash, is_banned, ban_reason')
                     .eq('username', u)
                     .single();
 
                 if (error || !data) {
                     document.getElementById('loginError').innerText = '用户名或密码错误';
+                    return;
+                }
+
+                // ===== 新增：封禁检查 =====
+                if (data.is_banned) {
+                    document.getElementById('loginError').innerText = '账号已被封禁：' + (data.ban_reason || '违规操作');
                     return;
                 }
 
@@ -1776,14 +1779,24 @@
             const savedDevice = localStorage.getItem('starry_device');
             if (savedToken) {
                 try {
+                    // ===== 修改：查询 is_banned =====
                     const { data, error } = await db.from('users')
-                        .select('username, avatar, signature, remember_expires, remember_device')
+                        .select('username, avatar, signature, remember_expires, remember_device, is_banned')
                         .eq('remember_token', savedToken)
                         .single();
                     if (data && !error && new Date(data.remember_expires) > new Date()) {
                         if (data.remember_device && savedDevice && data.remember_device !== savedDevice) {
                             localStorage.removeItem('starry_remember');
                             localStorage.removeItem('starry_device');
+                            document.getElementById('welcomePage').style.display = 'flex';
+                            runTypeWriter();
+                            return;
+                        }
+                        // ===== 新增：封禁检查 =====
+                        if (data.is_banned) {
+                            localStorage.removeItem('starry_remember');
+                            localStorage.removeItem('starry_device');
+                            alert('⛔ 账号已被封禁');
                             document.getElementById('welcomePage').style.display = 'flex';
                             runTypeWriter();
                             return;
@@ -1814,94 +1827,99 @@
         }
 
         // ============================================================
-        // 主聊天逻辑
+        // 主聊天逻辑（统一入口）
         // ============================================================
         function enterChat() {
-            stopBanMonitoring();
-            stopMaintenanceMonitoring();
-            if (roomSubscription) {
-                try { db.removeChannel(roomSubscription); } catch (_) {}
-                roomSubscription = null;
-            }
-
+            // 隐藏其他页面
             document.getElementById('authPage').style.display = 'none';
             document.getElementById('welcomePage').style.display = 'none';
             document.getElementById('signaturePage').style.display = 'none';
             document.getElementById('chatApp').style.display = 'flex';
+
+            // 更新头像
             const avatarUrl = getAvatarUrl(currentUser.username, currentUser.avatar);
             document.getElementById('myAvatar').src = avatarUrl;
 
+            // ===== 统一路由检测：无论是否有路由，都调用 checkAndSwitchRoom =====
             const roomFromURL = detectRoomFromURL();
             if (roomFromURL) {
                 checkAndSwitchRoom(roomFromURL);
             } else {
-                loadRooms();
-                loadMessages('大厅', true);
-                subscribeToMessages();
-                subscribePrivateMessages();
-                subscribeCalls();
-                updateMemberList();
-                document.getElementById('chatRoomName').textContent = '🏠 大厅';
+                checkAndSwitchRoom('大厅');
             }
 
-            subscribeRooms();
+            // 启动监控（这些不需要等待房间加载完成）
             startBanMonitoring();
             startMaintenanceMonitoring();
 
-            const announcement = localStorage.getItem('site_announcement');
-            if (announcement) {
-                console.log('📢 公告：', announcement);
-            }
-
-            document.getElementById('chatArea').addEventListener('click', function() {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar.classList.contains('show')) sidebar.classList.remove('show');
-            });
-
+            // 焦点
             setTimeout(() => {
                 document.getElementById('messageInput').focus();
             }, 300);
         }
 
         // ============================================================
-        // 房间切换（路由核心）
+        // 房间切换（核心路由 + 初始化）
         // ============================================================
         async function checkAndSwitchRoom(roomName) {
+            // 查询房间是否存在
             const { data } = await db.from('messages')
                 .select('room')
                 .eq('room', roomName)
                 .limit(1);
+
             if (data && data.length > 0) {
+                // 房间存在，进入
                 currentRoom = roomName;
+
+                // 加载房间列表、消息、订阅等
                 loadRooms();
                 loadMessages(roomName, true);
                 subscribeToMessages();
                 subscribePrivateMessages();
                 subscribeCalls();
                 updateMemberList();
-                document.getElementById('chatRoomName').textContent = '🔒 ' + roomName;
+
+                // 更新标题
+                document.getElementById('chatRoomName').textContent = roomName === '大厅' ? '🏠 大厅' : '🔒 ' + roomName;
+
+                // 更新 URL（清除 path 参数，用 pathname 表示）
+                const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
+                if (roomName !== '大厅') {
+                    const newUrl = window.location.origin + basePath + '/' + encodeURIComponent(roomName);
+                    window.history.pushState({ room: roomName }, '', newUrl);
+                } else {
+                    window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath + '/');
+                }
+
+                // 高亮房间列表
                 document.querySelectorAll('.room-item').forEach(el => {
                     el.classList.toggle('active', el.textContent.includes(roomName));
                 });
-                const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                if (!window.location.pathname.includes(roomName)) {
-                    window.history.pushState({ room: roomName }, '', window.location.origin + basePath + '/' +
-                        encodeURIComponent(roomName));
+
+                // 清除 URL 中可能残留的 path 参数
+                const url = new URL(window.location);
+                if (url.searchParams.has('path')) {
+                    url.searchParams.delete('path');
+                    window.history.replaceState({}, '', url.toString());
                 }
             } else {
+                // 房间不存在，显示 404
                 document.getElementById('chatMessages').innerHTML = `
                     <div class="room-not-found">
                         <div class="icon">🌌</div>
                         <h2>房间不存在</h2>
                         <p>房间 "${escapeHtml(roomName)}" 还没被创建</p>
-                        <button class="btn btn-primary" onclick="window.location.href='/starrychat/'">返回星迹</button>
+                        <button class="btn btn-primary" onclick="checkAndSwitchRoom('大厅')">返回大厅</button>
                     </div>
                 `;
-                document.getElementById('chatRoomName').textContent = '❓ 未找到';
-                loadRooms();
+                document.getElementById('chatRoomName').textContent = '❌ 未找到';
+                loadRooms(); // 仍然加载房间列表
+                // 3秒后自动返回大厅
                 setTimeout(() => {
-                    if (currentRoom === '大厅') return;
-                    window.location.href = '/starrychat/';
+                    if (currentRoom !== '大厅') {
+                        checkAndSwitchRoom('大厅');
+                    }
                 }, 3000);
             }
         }
@@ -2054,55 +2072,15 @@
                 }
                 div.addEventListener('click', function(e) {
                     if (e.target.closest('.room-actions')) return;
-                    switchRoom(room);
+                    checkAndSwitchRoom(room);
                 });
                 list.appendChild(div);
             });
         }
 
         function switchRoom(room) {
-            if (room !== '大厅') {
-                const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                const newUrl = window.location.origin + basePath + '/' + encodeURIComponent(room);
-                window.history.pushState({ room: room }, '', newUrl);
-            } else {
-                const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath + '/');
-            }
-
-            wsChannels = wsChannels.filter(ch => {
-                if (ch.topic && ch.topic.includes('messages')) {
-                    try { db.removeChannel(ch); } catch (_) {}
-                    return false;
-                }
-                return true;
-            });
-
-            currentRoom = room;
-            document.getElementById('chatRoomName').textContent = room === '大厅' ? '🏠 大厅' : '🔒 ' + room;
-            document.getElementById('chatMessages').innerHTML = '';
-            currentPage = 0;
-            hasMoreMessages = true;
-            oldestMessageCreatedAt = null;
-            const trigger = document.createElement('div');
-            trigger.className = 'load-more-trigger';
-            trigger.id = 'loadMoreTrigger';
-            trigger.textContent = '⬆ 点击加载更早消息';
-            trigger.onclick = loadMoreMessages;
-            document.getElementById('chatMessages').appendChild(trigger);
-            loadMessages(room, true);
-            subscribeToMessages();
-            document.querySelectorAll('.room-item').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.room-item').forEach(item => {
-                if (item.textContent.includes(room) || (room === '大厅' && item.textContent.includes('🏠'))) item
-                    .classList.add('active');
-            });
-            document.getElementById('sidebar').classList.remove('show');
-            updateMemberList();
-
-            setTimeout(() => {
-                document.getElementById('messageInput').focus();
-            }, 300);
+            // 这个函数现在由 checkAndSwitchRoom 替代，保留以防外部调用
+            checkAndSwitchRoom(room);
         }
 
         async function showCreateRoom() {
@@ -2141,14 +2119,14 @@
                     }
                     div.onclick = (e) => {
                         if (e.target.closest('.room-actions')) return;
-                        switchRoom(roomName);
+                        checkAndSwitchRoom(roomName);
                     };
                     document.getElementById('roomList').appendChild(div);
                     const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
                     window.history.pushState({ room: roomName }, '', window.location.origin + basePath + '/' +
                         encodeURIComponent(roomName));
                 }
-                switchRoom(roomName);
+                checkAndSwitchRoom(roomName);
             }
         }
 
@@ -2163,7 +2141,7 @@
                 if (currentRoom === room) {
                     const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
                     window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath + '/');
-                    switchRoom('大厅');
+                    checkAndSwitchRoom('大厅');
                 }
                 alert('✅ 房间已删除');
                 delete roomOwners[room];
@@ -2945,35 +2923,28 @@
             const room = event.state?.room;
             if (room && room !== currentRoom) {
                 if (room === '大厅') {
-                    switchRoom('大厅');
+                    checkAndSwitchRoom('大厅');
                 } else {
                     db.from('messages').select('room').eq('room', room).limit(1).then(({ data }) => {
                         if (data && data.length > 0) {
-                            switchRoom(room);
+                            checkAndSwitchRoom(room);
                         } else {
                             const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
                             window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath +
                             '/');
-                            switchRoom('大厅');
+                            checkAndSwitchRoom('大厅');
                         }
                     });
                 }
             }
         });
 
+        // ============================================================
+        // 启动
+        // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
+            // 只调用 autoLogin，不再做路由轮询（enterChat 会统一处理）
             autoLogin();
-            // 检查路由参数
-            var room = detectRoomFromURL();
-            if (room && room !== '大厅') {
-                // 如果还没有登录，等登录后处理
-                var checkUser = setInterval(function() {
-                    if (currentUser.username) {
-                        clearInterval(checkUser);
-                        checkAndSwitchRoom(room);
-                    }
-                }, 500);
-            }
         });
     </script>
 </body>
