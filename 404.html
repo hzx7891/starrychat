@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>星迹 · 页面未找到</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background: #0b0d15;
@@ -23,10 +19,7 @@
             padding: 24px;
             text-align: center;
         }
-        .icon {
-            font-size: 72px;
-            opacity: 0.5;
-        }
+        .icon { font-size: 72px; opacity: 0.5; }
         h1 {
             font-size: 28px;
             font-weight: 300;
@@ -35,18 +28,8 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        p {
-            color: #9aa8c7;
-            font-size: 16px;
-            max-width: 400px;
-            line-height: 1.6;
-        }
-        .countdown {
-            font-size: 48px;
-            font-weight: 700;
-            color: #7c6df0;
-            margin-top: 8px;
-        }
+        p { color: #9aa8c7; font-size: 16px; max-width: 400px; line-height: 1.6; }
+        .countdown { font-size: 48px; font-weight: 700; color: #7c6df0; margin-top: 8px; }
         .btn {
             padding: 12px 36px;
             border: none;
@@ -59,14 +42,8 @@
             transition: transform 0.2s;
             margin-top: 8px;
         }
-        .btn:hover {
-            transform: scale(1.04);
-        }
-        .sub {
-            color: #5d6f8f;
-            font-size: 13px;
-            margin-top: 12px;
-        }
+        .btn:hover { transform: scale(1.04); }
+        .sub { color: #5d6f8f; font-size: 13px; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -78,28 +55,39 @@
     <div class="sub">星迹 StarryChat · 连接每一颗星</div>
 
     <script>
-        // ================================================================
-        // 404 页面 —— 将原始路径传递给 index.html
-        // ================================================================
-
         (function() {
             // 获取当前完整路径
-            const fullPath = window.location.pathname + window.location.search + window.location.hash;
+            const fullPath = window.location.pathname;
 
-            // 提取房间名：去掉开头的 / 和 index.html 等
+            // 提取房间名：去掉 /starrychat/ 前缀和 index.html 等
             let roomName = null;
-            const path = window.location.pathname;
-            if (path && path !== '/' && path !== '/index.html') {
-                const parts = path.split('/').filter(s => s && s !== 'index.html');
-                if (parts.length > 0) {
+            let cleanPath = fullPath;
+
+            // 移除项目前缀（假设部署在 /starrychat/）
+            if (cleanPath.startsWith('/starrychat/')) {
+                cleanPath = cleanPath.substring('/starrychat/'.length);
+            } else if (cleanPath.startsWith('/')) {
+                cleanPath = cleanPath.substring(1);
+            }
+
+            // 去掉末尾斜杠
+            cleanPath = cleanPath.replace(/\/$/, '');
+
+            // 提取第一个路径段作为房间名，排除 index.html 和空
+            const parts = cleanPath.split('/').filter(p => p && p !== 'index.html');
+            if (parts.length > 0) {
+                // 解码 URI 组件，处理中文或特殊字符
+                try {
                     roomName = decodeURIComponent(parts[0]);
+                } catch (_) {
+                    roomName = parts[0];
                 }
             }
 
-            // 如果有房间名，构造跳转URL
-            let targetUrl = '/';
+            // 构造跳转 URL：始终跳转到 /starrychat/index.html?path=房间名
+            let targetUrl = '/starrychat/index.html';
             if (roomName) {
-                targetUrl = '/?path=' + encodeURIComponent(roomName);
+                targetUrl += '?path=' + encodeURIComponent(roomName);
             }
 
             // 倒计时
