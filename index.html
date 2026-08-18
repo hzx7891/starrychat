@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>星迹 StarryChat</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C5CE7'/%3E%3Cstop offset='100%25' stop-color='%2300B894'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='48' fill='url(%23g)'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle' fill='white' font-family='system-ui'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         /* ===== 完整样式（已精简，只保留核心布局） ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -149,7 +147,7 @@
         .search-bar input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1); }
 
         #chatMessages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-primary); }
-        .load-more-trigger { text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; transition: all var(--transition); border: none; background: transparent; display: block; /* 永远不隐藏 */ }
+        .load-more-trigger { text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; transition: all var(--transition); border: none; background: transparent; display: block; }
         .load-more-trigger:hover { color: var(--text-primary); }
         .load-more-trigger.loading { color: var(--text-muted); cursor: default; }
         .load-more-trigger .loader { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border-color); border-top: 2px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
@@ -261,6 +259,8 @@
         .room-not-found h2 { font-size: 1.5rem; margin-bottom: 8px; }
         .room-not-found p { color: var(--text-muted); }
         .room-not-found .btn { margin-top: 20px; }
+
+        .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border-color); border-top: 2px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
     </style>
 </head>
 <body>
@@ -309,7 +309,7 @@
             <label class="remember-row">
                 <input type="checkbox" id="rememberMe" checked /> 记住我 (7天免登录)
             </label>
-            <button class="btn btn-primary" onclick="login()">登录</button>
+            <button class="btn btn-primary" id="loginBtn" onclick="login()">登录</button>
             <div class="switch" onclick="showRegister()">还没有账号？注册 →</div>
             <div id="loginError" class="error"></div>
             <div class="legal-text">
@@ -325,7 +325,7 @@
             <p class="subtitle">加入星迹，开启你的星空旅程</p>
             <input class="input-field" id="regUsername" placeholder="用户名" />
             <input class="input-field" id="regPassword" type="password" placeholder="密码" />
-            <button class="btn btn-primary" onclick="register()">注册</button>
+            <button class="btn btn-primary" id="regBtn" onclick="register()">注册</button>
             <div class="switch" onclick="showLogin()">已有账号？返回登录</div>
             <div id="regError" class="error"></div>
             <div class="legal-text">
@@ -375,7 +375,7 @@
                     <input type="file" id="fileInput" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z" style="display:none;" />
                     <button class="icon-btn" onclick="document.getElementById('fileInput').click()" title="发送文件">📎</button>
                     <button class="icon-btn" onclick="toggleEmojiPanel()" title="表情">😊</button>
-                    <button class="icon-btn" onclick="startCall()" title="视频通话">📞</button>
+                    <button class="icon-btn" onclick="startCallFromInput()" title="视频通话">📞</button>
                     <input type="text" id="messageInput" placeholder="输入消息… ( @ai 召唤AI )" autocomplete="off" />
                     <button class="send-btn" onclick="sendMessage()">➤</button>
                 </div>
@@ -443,59 +443,44 @@
         let callTarget = '';
         let isAdmin = false;
 
-        // 分页相关
         let currentPage = 0;
         const PAGE_SIZE = 30;
         let isLoadingMore = false;
         let hasMoreMessages = true;
         let oldestMessageCreatedAt = null;
 
-        // 封禁检查定时器
         let banCheckInterval = null;
         let banSubscription = null;
-
-        // 维护检查定时器
         let maintenanceCheckInterval = null;
-
-        // 房间订阅
         let roomSubscription = null;
-
-        // 当前房间列表
         let currentRoomList = [];
+        let loadMoreObserver = null;
+        let memberRefreshInterval = null;
+        let globalChannel = null;
 
         const emojis = ['😀', '😂', '😍', '😢', '😡', '👍', '👎', '🎉', '✨', '🔥', '❤️', '💔', '😭', '🤔', '😎', '😴', '😇', '🤣', '😱', '🥰', '🤩',
-            '😜', '😤', '🥺', '🧐', '🤗', '😺', '🙈', '💀', '👀','哦不不不 bro的彩蛋被你找到了！'
+            '😜', '😤', '🥺', '🧐', '🤗', '😺', '🙈', '💀', '👀'
         ];
 
         // ============================================================
         // 工具函数
         // ============================================================
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
-
-        // 固定盐
         const FIXED_SALT = 'StarryChat_2024';
 
         // ===== 修复：密码验证支持 6 种哈希方式 =====
         function verifyPassword(inputPassword, storedHash) {
             if (!inputPassword || !storedHash) return false;
-            // 1. 固定盐：StarryChat_2024 + password + StarryChat_2024
             if (sha256(FIXED_SALT + inputPassword + FIXED_SALT) === storedHash) return true;
-            // 2. 无盐：sha256(password)
             if (sha256(inputPassword) === storedHash) return true;
-            // 3. 空盐：sha256('' + password + '')
             if (sha256('' + inputPassword + '') === storedHash) return true;
-            // 4. 盐前缀：StarryChat_2024 + password
             if (sha256(FIXED_SALT + inputPassword) === storedHash) return true;
-            // 5. 盐后缀：password + StarryChat_2024
             if (sha256(inputPassword + FIXED_SALT) === storedHash) return true;
-            // 6. 双重哈希：sha256(sha256(password))
             if (sha256(sha256(inputPassword)) === storedHash) return true;
             return false;
         }
 
-        function hashPassword(password) {
-            return sha256(FIXED_SALT + password + FIXED_SALT);
-        }
+        function hashPassword(password) { return sha256(FIXED_SALT + password + FIXED_SALT); }
 
         function UUID() {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -505,13 +490,7 @@
         }
 
         function getDeviceFingerprint() {
-            const components = [
-                navigator.userAgent || '',
-                navigator.language || '',
-                screen.width || '',
-                screen.height || '',
-                navigator.hardwareConcurrency || ''
-            ];
+            const components = [navigator.userAgent || '', navigator.language || '', screen.width || '', screen.height || ''];
             return sha256(components.join('|')).substring(0, 16);
         }
 
@@ -522,76 +501,61 @@
         }
 
         function isValidUrl(url) {
-            try {
-                const parsed = new URL(url);
-                return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-            } catch (_) { return false; }
+            try { const p = new URL(url); return p.protocol === 'http:' || p.protocol === 'https:'; } catch (_) { return false; }
         }
 
         function safeLinkify(text) {
             if (!text) return '';
             let escaped = escapeHtml(text);
             const urlRegex = /(https?:\/\/[^\s<]+)/g;
-            return escaped.replace(urlRegex, function(match) {
-                return `<a href="${match}" target="_blank" class="link-safe">${match}</a>`;
-            });
+            return escaped.replace(urlRegex, function(match) { return `<a href="${match}" target="_blank" class="link-safe">${match}</a>`; });
         }
 
         function playSound() {
             if (!soundEnabled) return;
             try {
-                if (!window._audioCtx) {
-                    window._audioCtx = new(window.AudioContext || window.webkitAudioContext)();
-                }
+                if (!window._audioCtx) window._audioCtx = new(window.AudioContext || window.webkitAudioContext)();
                 const ctx = window._audioCtx;
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
+                osc.connect(gain); gain.connect(ctx.destination);
                 osc.frequency.value = 880;
                 gain.gain.setValueAtTime(0.2, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.12);
+                osc.start(); osc.stop(ctx.currentTime + 0.12);
             } catch (_) {}
         }
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('show'); }
+        function closeModal(id) { const el = document.getElementById(id); el.classList.remove('active'); el.style.display = 'none'; }
+        function openModal(id) { const el = document.getElementById(id); el.style.display = 'flex'; requestAnimationFrame(() => el.classList.add('active')); }
 
-        function closeModal(id) {
-            const el = document.getElementById(id);
-            el.classList.remove('active');
-            el.style.display = 'none';
-        }
-
-        function openModal(id) {
-            const el = document.getElementById(id);
-            el.style.display = 'flex';
-            requestAnimationFrame(() => el.classList.add('active'));
-        }
-
+        // ===== 修复：头像渲染，处理特殊字符和AI助手 =====
         function getAvatarUrl(username, avatar) {
             if (avatar) return avatar;
             if (username === '🛡️ 系统') {
                 return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23f39c12"/%3E%3Ctext x="50" y="72" font-size="50" text-anchor="middle" fill="white" font-family="system-ui"%3E🛡️%3C/text%3E%3C/svg%3E';
             }
-            const initial = (username || '?')[0].toUpperCase();
-            const safeInitial = initial.replace(/[^A-Za-z0-9\u4e00-\u9fa5]/g, '');
+            if (username === '🤖 AI助手') {
+                return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%236C5CE7"/%3E%3Ctext x="50" y="72" font-size="50" text-anchor="middle" fill="white" font-family="system-ui"%3E🤖%3C/text%3E%3C/svg%3E';
+            }
+            const safeName = (username || '?').trim();
+            let firstChar = safeName[0] || '?';
+            // 尝试找到第一个字母、数字或中文
+            const match = safeName.match(/[A-Za-z0-9\u4e00-\u9fa5]/);
+            if (match) firstChar = match[0];
+            const upper = firstChar.toUpperCase();
+            const safeInitial = upper.replace(/[^A-Za-z0-9\u4e00-\u9fa5]/g, '') || '?';
             return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C5CE7'/%3E%3Cstop offset='100%25' stop-color='%2300B894'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='50' fill='url(%23a)'/%3E%3Ctext x='50' y='68' font-size='44' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'%3E${escapeHtml(safeInitial)}%3C/text%3E%3C/svg%3E`;
         }
 
         function formatTime(ts) {
             if (!ts) return '';
-            try {
-                return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-            } catch (_) { return ''; }
+            try { return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
         }
-
         function formatFullTime(ts) {
             if (!ts) return '-';
-            try {
-                return new Date(ts).toLocaleString('zh-CN', { hour12: false });
-            } catch (_) { return '-'; }
+            try { return new Date(ts).toLocaleString('zh-CN', { hour12: false }); } catch (_) { return '-'; }
         }
 
         // ============================================================
@@ -606,15 +570,11 @@
             let textIndex = 0;
             const currentText = welcomeTexts[0];
             emojiEl.textContent = welcomeEmojis[0];
-
             function typeWithText(text) {
-                let idx = 0;
-                textEl.textContent = '';
-
+                let idx = 0; textEl.textContent = '';
                 function step() {
                     if (idx < text.length) {
-                        textEl.textContent += text.charAt(idx);
-                        idx++;
+                        textEl.textContent += text.charAt(idx); idx++;
                         setTimeout(step, 70 + Math.random() * 30);
                     } else {
                         setTimeout(() => {
@@ -630,39 +590,29 @@
         }
 
         // ============================================================
-        // 路由检测（支持查询参数中的 path）
+        // 路由检测
         // ============================================================
         function detectRoomFromURL() {
-            // 优先从 location.search 中解析 path 参数（由 404.html 重定向带来）
             var searchParams = new URLSearchParams(location.search);
             var path = searchParams.get('path') || '';
             if (path) {
                 path = path.replace(/^\//, '');
-                if (path.startsWith('starrychat/')) {
-                    path = path.substring('starrychat/'.length);
-                }
+                if (path.startsWith('starrychat/')) path = path.substring('starrychat/'.length);
                 var parts = path.split('/').filter(p => p);
                 if (parts.length > 0) {
                     var roomName = decodeURIComponent(parts[0]);
-                    if (roomName && roomName !== 'index.html' && roomName !== '' && !roomName.includes('.')) {
-                        return roomName;
-                    }
+                    if (roomName && roomName !== 'index.html' && !roomName.includes('.')) return roomName;
                 }
             }
             var pathname = window.location.pathname;
             var cleanPath = pathname;
-            if (cleanPath.startsWith('/starrychat/')) {
-                cleanPath = cleanPath.substring('/starrychat/'.length);
-            } else if (cleanPath.startsWith('/')) {
-                cleanPath = cleanPath.substring(1);
-            }
+            if (cleanPath.startsWith('/starrychat/')) cleanPath = cleanPath.substring('/starrychat/'.length);
+            else if (cleanPath.startsWith('/')) cleanPath = cleanPath.substring(1);
             cleanPath = cleanPath.replace(/\/$/, '');
             var parts2 = cleanPath.split('/').filter(p => p && p !== 'starrychat');
             if (parts2.length > 0) {
                 var roomName2 = decodeURIComponent(parts2[0]);
-                if (roomName2 && roomName2 !== 'index.html' && roomName2 !== '' && !roomName2.includes('.')) {
-                    return roomName2;
-                }
+                if (roomName2 && roomName2 !== 'index.html' && !roomName2.includes('.')) return roomName2;
             }
             return null;
         }
@@ -675,9 +625,7 @@
             document.getElementById('signaturePage').style.display = 'flex';
             if (currentUser.username) {
                 document.getElementById('signatureInput').value = currentUser.signature || '';
-                if (currentUser.avatar) {
-                    document.getElementById('sigAvatarPreview').src = currentUser.avatar;
-                }
+                if (currentUser.avatar) document.getElementById('sigAvatarPreview').src = currentUser.avatar;
             }
         }
 
@@ -700,19 +648,14 @@
             const sig = document.getElementById('signatureInput').value.trim();
             if (currentUser.username) {
                 const updates = { signature: sig };
-                if (currentUser._tempAvatar) {
-                    updates.avatar = currentUser._tempAvatar;
-                }
+                if (currentUser._tempAvatar) updates.avatar = currentUser._tempAvatar;
                 await db.from('users').update(updates).eq('username', currentUser.username);
                 if (updates.avatar) currentUser.avatar = updates.avatar;
                 currentUser.signature = sig;
             }
             document.getElementById('signaturePage').style.display = 'none';
-            if (currentUser.username) {
-                enterChat();
-            } else {
-                document.getElementById('authPage').style.display = 'flex';
-            }
+            if (currentUser.username) enterChat();
+            else document.getElementById('authPage').style.display = 'flex';
         }
 
         function skipToAuth() {
@@ -724,11 +667,7 @@
         // 文本审核
         // ============================================================
         const blockedWords = /色情|强奸|暴力|赌博|赌场|彩票|porn|fuck|dick|pussy|asshole|gambling|约炮|裸聊|小姐|上门|包夜|外围|迷奸|迷药|吸毒|大麻/gi;
-
-        function containsBlockedText(text) {
-            blockedWords.lastIndex = 0;
-            return blockedWords.test(text);
-        }
+        function containsBlockedText(text) { blockedWords.lastIndex = 0; return blockedWords.test(text); }
 
         // ============================================================
         // AI 图片审核
@@ -739,38 +678,23 @@
                 const formData = new FormData();
                 formData.append('image', base64Data);
                 const res = await fetch('https://api.api-ninjas.com/v1/nsfwimage', {
-                    method: 'POST',
-                    headers: { 'X-Api-Key': API_NINJAS_KEY },
-                    body: formData
+                    method: 'POST', headers: { 'X-Api-Key': API_NINJAS_KEY }, body: formData
                 });
                 if (!res.ok) return false;
                 const data = await res.json();
-                const nsfwScore = Math.max(data.porn || 0, data.hentai || 0, data.sexy || 0);
-                return nsfwScore > 0.7;
-            } catch (e) {
-                console.warn('AI 图片审核失败', e);
-                return false;
-            }
+                return Math.max(data.porn || 0, data.hentai || 0, data.sexy || 0) > 0.7;
+            } catch (e) { console.warn('AI 图片审核失败', e); return false; }
         }
 
         // ============================================================
-        // 登录 / 注册
+        // 登录 / 注册（添加 loading 动画）
         // ============================================================
-        function showRegister() { document.getElementById('loginBox').style.display = 'none';
-            document.getElementById('regBox').style.display = 'block'; }
-
-        function showLogin() { document.getElementById('regBox').style.display = 'none';
-            document.getElementById('loginBox').style.display = 'block'; }
+        function showRegister() { document.getElementById('loginBox').style.display = 'none'; document.getElementById('regBox').style.display = 'block'; }
+        function showLogin() { document.getElementById('regBox').style.display = 'none'; document.getElementById('loginBox').style.display = 'block'; }
 
         function checkMaintenance() {
-            try {
-                const maintenance = localStorage.getItem('maintenance_mode');
-                if (maintenance === 'true') {
-                    alert('🔧 系统正在维护中，请稍后再来');
-                    return true;
-                }
-                return false;
-            } catch (_) { return false; }
+            try { if (localStorage.getItem('maintenance_mode') === 'true') { alert('🔧 系统正在维护中，请稍后再来'); return true; } } catch (_) {}
+            return false;
         }
 
         async function login() {
@@ -778,47 +702,30 @@
             const u = document.getElementById('loginUser').value.trim();
             const p = document.getElementById('loginPassword').value;
             const remember = document.getElementById('rememberMe').checked;
-            if (!u || !p) {
-                document.getElementById('loginError').innerText = '用户名或密码错误';
-                return;
-            }
+            const btn = document.getElementById('loginBtn');
+            const errEl = document.getElementById('loginError');
+            if (!u || !p) { errEl.innerText = '用户名或密码错误'; return; }
+
+            // 显示 loading
+            btn.innerHTML = '<span class="spinner"></span> 登录中...';
+            btn.disabled = true;
 
             try {
-                // 查询 is_banned 和 ban_reason
                 const { data, error } = await db.from('users')
                     .select('username, avatar, signature, password_hash, is_banned, ban_reason')
-                    .eq('username', u)
-                    .single();
+                    .eq('username', u).single();
 
-                if (error || !data) {
-                    document.getElementById('loginError').innerText = '用户名或密码错误';
-                    return;
-                }
+                if (error || !data) { errEl.innerText = '用户名或密码错误'; return; }
+                if (data.is_banned) { errEl.innerText = '账号已被封禁：' + (data.ban_reason || '违规操作'); return; }
+                if (!verifyPassword(p, data.password_hash)) { errEl.innerText = '用户名或密码错误'; return; }
 
-                // 封禁检查
-                if (data.is_banned) {
-                    document.getElementById('loginError').innerText = '账号已被封禁：' + (data.ban_reason || '违规操作');
-                    return;
-                }
-
-                if (!verifyPassword(p, data.password_hash)) {
-                    document.getElementById('loginError').innerText = '用户名或密码错误';
-                    return;
-                }
-
-                currentUser = {
-                    username: data.username,
-                    avatar: data.avatar || '',
-                    signature: data.signature || ''
-                };
+                currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '' };
                 isAdmin = data.username === 'hzx7891';
 
                 try {
                     const deviceInfo = navigator.userAgent || '未知设备';
-                    await db.from('login_logs').insert({ username: u, device: deviceInfo, created_at: new Date()
-                            .toISOString() });
-                    await db.from('users').update({ last_login_at: new Date().toISOString(), last_device: deviceInfo })
-                        .eq('username', u);
+                    await db.from('login_logs').insert({ username: u, device: deviceInfo, created_at: new Date().toISOString() });
+                    await db.from('users').update({ last_login_at: new Date().toISOString(), last_device: deviceInfo }).eq('username', u);
                 } catch (logErr) { console.warn('日志记录失败', logErr); }
 
                 if (remember) {
@@ -827,27 +734,29 @@
                         const deviceFingerprint = getDeviceFingerprint();
                         const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
                         await db.from('users').update({
-                            remember_token: token,
-                            remember_expires: expires,
-                            remember_device: deviceFingerprint
+                            remember_token: token, remember_expires: expires, remember_device: deviceFingerprint
                         }).eq('username', u);
                         localStorage.setItem('starry_remember', token);
                         localStorage.setItem('starry_device', deviceFingerprint);
-                    } catch (tokenErr) { console.warn('记住我写入失败', tokenErr); }
+                    } catch (tokenErr) {
+                        console.warn('记住我写入失败', tokenErr);
+                        localStorage.removeItem('starry_remember');
+                        localStorage.removeItem('starry_device');
+                    }
                 } else {
                     localStorage.removeItem('starry_remember');
                     localStorage.removeItem('starry_device');
                     await db.from('users').update({ remember_token: null, remember_expires: null }).eq('username', u);
                 }
 
-                if (!currentUser.signature && !currentUser.avatar) {
-                    showSignaturePage();
-                    return;
-                }
+                if (!currentUser.signature && !currentUser.avatar) { showSignaturePage(); return; }
                 enterChat();
             } catch (err) {
-                document.getElementById('loginError').innerText = '网络错误，请重试';
+                errEl.innerText = '网络错误，请重试';
                 console.error(err);
+            } finally {
+                btn.innerHTML = '登录';
+                btn.disabled = false;
             }
         }
 
@@ -855,33 +764,34 @@
             if (checkMaintenance()) return;
             const u = document.getElementById('regUsername').value.trim();
             const p = document.getElementById('regPassword').value;
-            if (!u || !p) { document.getElementById('regError').innerText = '请填写完整信息'; return; }
-            if (u.length < 2) { document.getElementById('regError').innerText = '用户名至少2个字符'; return; }
-            if (p.length < 4) { document.getElementById('regError').innerText = '密码至少4个字符'; return; }
+            const btn = document.getElementById('regBtn');
+            const errEl = document.getElementById('regError');
+            if (!u || !p) { errEl.innerText = '请填写完整信息'; return; }
+            if (u.length < 2) { errEl.innerText = '用户名至少2个字符'; return; }
+            if (p.length < 4) { errEl.innerText = '密码至少4个字符'; return; }
+
+            btn.innerHTML = '<span class="spinner"></span> 注册中...';
+            btn.disabled = true;
 
             try {
                 const { data: existing } = await db.from('users').select('username').eq('username', u).single();
-                if (existing) { document.getElementById('regError').innerText = '用户名已存在'; return; }
-
+                if (existing) { errEl.innerText = '用户名已存在'; return; }
                 const hashedPassword = hashPassword(p);
-
-                await db.from('users').insert({
-                    username: u,
-                    password_hash: hashedPassword,
-                    avatar: '',
-                    signature: '',
-                    is_banned: false
-                });
+                await db.from('users').insert({ username: u, password_hash: hashedPassword, avatar: '', signature: '', is_banned: false });
                 alert('🎉 注册成功！请登录');
                 showLogin();
                 document.getElementById('loginUser').value = u;
                 document.getElementById('loginPassword').value = '';
             } catch (err) {
-                document.getElementById('regError').innerText = '注册失败，请重试';
+                errEl.innerText = '注册失败，请重试';
                 console.error(err);
+            } finally {
+                btn.innerHTML = '注册';
+                btn.disabled = false;
             }
         }
 
+        // ===== 修复：记住我，放宽设备检查 =====
         async function autoLogin() {
             if (checkMaintenance()) {
                 document.getElementById('welcomePage').style.display = 'flex';
@@ -889,14 +799,14 @@
                 return;
             }
             const savedToken = localStorage.getItem('starry_remember');
-            const savedDevice = localStorage.getItem('starry_device');
             if (savedToken) {
                 try {
                     const { data, error } = await db.from('users')
                         .select('username, avatar, signature, remember_expires, remember_device, is_banned')
-                        .eq('remember_token', savedToken)
-                        .single();
-                    if (data && !error && new Date(data.remember_expires) > new Date()) {
+                        .eq('remember_token', savedToken).single();
+                    if (data && !error && data.remember_expires && new Date(data.remember_expires).getTime() > Date.now()) {
+                        // 放宽设备检查：只在设备和保存的设备都不为空且不匹配时拒绝
+                        const savedDevice = localStorage.getItem('starry_device');
                         if (data.remember_device && savedDevice && data.remember_device !== savedDevice) {
                             localStorage.removeItem('starry_remember');
                             localStorage.removeItem('starry_device');
@@ -912,78 +822,49 @@
                             runTypeWriter();
                             return;
                         }
-                        currentUser = {
-                            username: data.username,
-                            avatar: data.avatar || '',
-                            signature: data.signature || ''
-                        };
+                        currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '' };
                         isAdmin = data.username === 'hzx7891';
-                        if (!currentUser.signature && !currentUser.avatar) {
-                            showSignaturePage();
-                            return;
-                        }
+                        if (!currentUser.signature && !currentUser.avatar) { showSignaturePage(); return; }
                         enterChat();
                         return;
-                    } else {
-                        localStorage.removeItem('starry_remember');
-                        localStorage.removeItem('starry_device');
                     }
-                } catch (_) {
-                    localStorage.removeItem('starry_remember');
-                    localStorage.removeItem('starry_device');
-                }
+                } catch (_) {}
+                localStorage.removeItem('starry_remember');
+                localStorage.removeItem('starry_device');
             }
             document.getElementById('welcomePage').style.display = 'flex';
             runTypeWriter();
         }
 
         // ============================================================
-        // 主聊天逻辑（统一入口）
+        // 进入聊天（修复 URL 渲染）
         // ============================================================
         function enterChat() {
-            // 隐藏其他页面
             document.getElementById('authPage').style.display = 'none';
             document.getElementById('welcomePage').style.display = 'none';
             document.getElementById('signaturePage').style.display = 'none';
             document.getElementById('chatApp').style.display = 'flex';
 
-            // 更新头像
             const avatarUrl = getAvatarUrl(currentUser.username, currentUser.avatar);
             document.getElementById('myAvatar').src = avatarUrl;
 
-            // 统一路由检测：无论是否有路由，都调用 checkAndSwitchRoom
             const roomFromURL = detectRoomFromURL();
-            if (roomFromURL) {
-                checkAndSwitchRoom(roomFromURL);
-            } else {
-                checkAndSwitchRoom('大厅');
-            }
+            const targetRoom = roomFromURL || '大厅';
+            checkAndSwitchRoom(targetRoom);
 
-            // 启动监控（这些不需要等待房间加载完成）
             startBanMonitoring();
             startMaintenanceMonitoring();
+            setupGlobalChannel();
+            startMemberRefresh();
 
-            // 焦点
-            setTimeout(() => {
-                document.getElementById('messageInput').focus();
-            }, 300);
+            setTimeout(() => { document.getElementById('messageInput').focus(); }, 300);
         }
 
-        // ============================================================
-        // 房间切换（核心路由 + 初始化）
-        // ============================================================
+        // ===== 修复：URL 渲染使用 /starrychat/ 前缀 =====
         async function checkAndSwitchRoom(roomName) {
-            // 查询房间是否存在
-            const { data } = await db.from('messages')
-                .select('room')
-                .eq('room', roomName)
-                .limit(1);
-
+            const { data } = await db.from('messages').select('room').eq('room', roomName).limit(1);
             if (data && data.length > 0) {
-                // 房间存在，进入
                 currentRoom = roomName;
-
-                // 加载房间列表、消息、订阅等
                 loadRooms();
                 await loadMessages(roomName, true);
                 subscribeToMessages();
@@ -991,31 +872,24 @@
                 subscribeCalls();
                 updateMemberList();
 
-                // 更新标题
                 document.getElementById('chatRoomName').textContent = roomName === '大厅' ? '🏠 大厅' : '🔒 ' + roomName;
 
-                // 更新 URL（清除 path 参数，用 pathname 表示）
-                const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                if (roomName !== '大厅') {
-                    const newUrl = window.location.origin + basePath + '/' + encodeURIComponent(roomName);
-                    window.history.pushState({ room: roomName }, '', newUrl);
-                } else {
-                    window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath + '/');
-                }
+                // 更新 URL
+                const basePath = '/starrychat';
+                const newUrl = roomName !== '大厅' ? basePath + '/' + encodeURIComponent(roomName) : basePath + '/';
+                window.history.pushState({ room: roomName }, '', newUrl);
 
-                // 高亮房间列表
                 document.querySelectorAll('.room-item').forEach(el => {
                     el.classList.toggle('active', el.textContent.includes(roomName));
                 });
 
-                // 清除 URL 中可能残留的 path 参数
+                // 清除 path 参数
                 const url = new URL(window.location);
                 if (url.searchParams.has('path')) {
                     url.searchParams.delete('path');
                     window.history.replaceState({}, '', url.toString());
                 }
             } else {
-                // 房间不存在，显示 404
                 document.getElementById('chatMessages').innerHTML = `
                     <div class="room-not-found">
                         <div class="icon">🌌</div>
@@ -1025,97 +899,69 @@
                     </div>
                 `;
                 document.getElementById('chatRoomName').textContent = '❌ 未找到';
-                loadRooms(); // 仍然加载房间列表
-                // 3秒后自动返回大厅
-                setTimeout(() => {
-                    checkAndSwitchRoom('大厅');
-                }, 3000);
+                loadRooms();
+                setTimeout(() => { checkAndSwitchRoom('大厅'); }, 3000);
             }
         }
 
+        // ============================================================
+        // 监控
+        // ============================================================
         function stopBanMonitoring() {
-            if (banCheckInterval) { clearInterval(banCheckInterval);
-                banCheckInterval = null; }
-            if (banSubscription) {
-                try { db.removeChannel(banSubscription); } catch (_) {}
-                banSubscription = null; }
+            if (banCheckInterval) { clearInterval(banCheckInterval); banCheckInterval = null; }
+            if (banSubscription) { try { db.removeChannel(banSubscription); } catch (_) {} banSubscription = null; }
         }
-
         function stopMaintenanceMonitoring() {
-            if (maintenanceCheckInterval) { clearInterval(maintenanceCheckInterval);
-                maintenanceCheckInterval = null; }
+            if (maintenanceCheckInterval) { clearInterval(maintenanceCheckInterval); maintenanceCheckInterval = null; }
         }
-
         function startMaintenanceMonitoring() {
             stopMaintenanceMonitoring();
             maintenanceCheckInterval = setInterval(() => {
-                try {
-                    const maintenance = localStorage.getItem('maintenance_mode');
-                    if (maintenance === 'true') {
-                        alert('🔧 系统已进入维护模式，即将退出');
-                        logout();
-                    }
-                } catch (_) {}
+                try { if (localStorage.getItem('maintenance_mode') === 'true') { alert('🔧 系统已进入维护模式，即将退出'); logout(); } } catch (_) {}
             }, 10000);
         }
-
         function startBanMonitoring() {
             stopBanMonitoring();
             banCheckInterval = setInterval(async () => {
                 try {
-                    const { data } = await db.from('users')
-                        .select('is_banned')
-                        .eq('username', currentUser.username)
-                        .single();
-                    if (data && data.is_banned) {
-                        alert('⛔ 你的账号已被封禁');
-                        logout();
-                    }
+                    const { data } = await db.from('users').select('is_banned').eq('username', currentUser.username).single();
+                    if (data && data.is_banned) { alert('⛔ 你的账号已被封禁'); logout(); }
                 } catch (_) {}
             }, 7891);
-
             banSubscription = db.channel('user-ban-' + currentUser.username)
-                .on('postgres_changes', {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'users',
-                    filter: 'username=eq.' + currentUser.username
-                }, payload => {
-                    if (payload.new && payload.new.is_banned) {
-                        alert('⛔ 你的账号已被封禁');
-                        logout();
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: 'username=eq.' + currentUser.username }, payload => {
+                    if (payload.new && payload.new.is_banned) { alert('⛔ 你的账号已被封禁'); logout(); }
+                }).subscribe();
+        }
+
+        // ===== 修复：删除房间广播 =====
+        function setupGlobalChannel() {
+            if (globalChannel) { try { db.removeChannel(globalChannel); } catch (_) {} }
+            globalChannel = db.channel('global-updates');
+            globalChannel
+                .on('broadcast', { event: 'room_deleted' }, (payload) => {
+                    if (payload.room) {
+                        loadRooms();
+                        if (currentRoom === payload.room) {
+                            checkAndSwitchRoom('大厅');
+                        }
                     }
                 })
                 .subscribe();
         }
 
-        function subscribeRooms() {
-            if (roomSubscription) {
-                try { db.removeChannel(roomSubscription); } catch (_) {}
-                roomSubscription = null;
-            }
-            roomSubscription = db.channel('room-list-refresh')
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages'
-                }, payload => {
-                    const newRoom = payload.new.room;
-                    if (newRoom && !currentRoomList.includes(newRoom)) {
-                        currentRoomList.push(newRoom);
-                        loadRooms();
-                    }
-                })
-                .subscribe();
+        // ===== 修复：成员刷新 =====
+        function startMemberRefresh() {
+            if (memberRefreshInterval) clearInterval(memberRefreshInterval);
+            memberRefreshInterval = setInterval(() => { updateMemberList(); }, 30000);
         }
 
         function logout() {
             stopBanMonitoring();
             stopMaintenanceMonitoring();
-            if (roomSubscription) {
-                try { db.removeChannel(roomSubscription); } catch (_) {}
-                roomSubscription = null;
-            }
+            if (memberRefreshInterval) { clearInterval(memberRefreshInterval); memberRefreshInterval = null; }
+            if (globalChannel) { try { db.removeChannel(globalChannel); } catch (_) {} globalChannel = null; }
+            if (roomSubscription) { try { db.removeChannel(roomSubscription); } catch (_) {} roomSubscription = null; }
             hangUp();
             currentUser = { username: '', avatar: '', signature: '' };
             isAdmin = false;
@@ -1125,10 +971,8 @@
             document.getElementById('authPage').style.display = 'flex';
             wsChannels.forEach(ch => { try { db.removeChannel(ch); } catch (_) {} });
             wsChannels = [];
-            if (pc) { pc.close();
-                pc = null; }
-            if (localStream) { localStream.getTracks().forEach(t => t.stop());
-                localStream = null; }
+            if (pc) { pc.close(); pc = null; }
+            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
             document.getElementById('videoCallModal').classList.remove('active');
             document.getElementById('videoCallModal').style.display = 'none';
             document.getElementById('remoteVideo').srcObject = null;
@@ -1146,14 +990,10 @@
         async function loadRooms() {
             const list = document.getElementById('roomList');
             let rooms = ['大厅'];
-            const { data } = await db.from('messages').select('room, room_owner').order('created_at', { ascending: false })
-                .limit(1000);
+            const { data } = await db.from('messages').select('room, room_owner').order('created_at', { ascending: false }).limit(1000);
             if (data) {
                 const roomSet = new Set();
-                data.forEach(m => {
-                    if (m.room) roomSet.add(m.room);
-                    if (m.room && m.room_owner) roomOwners[m.room] = m.room_owner;
-                });
+                data.forEach(m => { if (m.room) roomSet.add(m.room); if (m.room && m.room_owner) roomOwners[m.room] = m.room_owner; });
                 roomSet.forEach(r => { if (r !== '大厅') rooms.push(r); });
             }
             currentRoomList = rooms;
@@ -1165,100 +1005,60 @@
                 const ownerLabel = isOwner ? ' 👑' : '';
                 div.innerHTML = `
                     <span>${room === '大厅' ? '🏠' : '🔒'} ${room}${ownerLabel}</span>
-                    ${room !== '大厅' ? `
-                        <span class="room-actions">
-                            ${isOwner || isAdmin ? `<button class="delete-room-btn" data-room="${escapeHtml(room)}" title="删除房间">✕</button>` : ''}
-                        </span>
-                    ` : ''}
+                    ${room !== '大厅' ? `<span class="room-actions">${isOwner || isAdmin ? `<button class="delete-room-btn" data-room="${escapeHtml(room)}" title="删除房间">✕</button>` : ''}</span>` : ''}
                 `;
                 const deleteBtn = div.querySelector('.delete-room-btn');
                 if (deleteBtn) {
-                    deleteBtn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        const roomName = this.dataset.room;
-                        deleteRoom(roomName);
-                    });
+                    deleteBtn.addEventListener('click', function(e) { e.stopPropagation(); deleteRoom(this.dataset.room); });
                 }
-                div.addEventListener('click', function(e) {
-                    if (e.target.closest('.room-actions')) return;
-                    checkAndSwitchRoom(room);
-                });
+                div.addEventListener('click', function(e) { if (e.target.closest('.room-actions')) return; checkAndSwitchRoom(room); });
                 list.appendChild(div);
             });
         }
 
-        function switchRoom(room) {
-            checkAndSwitchRoom(room);
-        }
+        function switchRoom(room) { checkAndSwitchRoom(room); }
 
         async function showCreateRoom() {
             const name = prompt('🏷️ 输入房间名：');
             if (name && name.trim()) {
                 const roomName = name.trim();
                 let exists = false;
-                document.querySelectorAll('.room-item').forEach(el => {
-                    if (el.textContent.includes(roomName)) exists = true;
-                });
+                document.querySelectorAll('.room-item').forEach(el => { if (el.textContent.includes(roomName)) exists = true; });
                 if (!exists) {
                     roomOwners[roomName] = currentUser.username;
                     await db.from('messages').insert({
-                        room: roomName,
-                        username: '🛡️ 系统',
-                        content: '✨ 房间 "' + roomName + '" 已创建！欢迎来聊天～',
-                        type: 'text',
-                        avatar: '',
-                        room_owner: currentUser.username,
-                        created_at: new Date().toISOString()
+                        room: roomName, username: '🛡️ 系统', content: '✨ 房间 "' + roomName + '" 已创建！欢迎来聊天～',
+                        type: 'text', avatar: '', room_owner: currentUser.username, created_at: new Date().toISOString()
                     });
-                    const div = document.createElement('div');
-                    div.className = 'room-item';
-                    div.innerHTML = `
-                        <span>🔒 ${roomName} 👑</span>
-                        <span class="room-actions">
-                            <button class="delete-room-btn" data-room="${escapeHtml(roomName)}" title="删除房间">✕</button>
-                        </span>
-                    `;
-                    const deleteBtn = div.querySelector('.delete-room-btn');
-                    if (deleteBtn) {
-                        deleteBtn.addEventListener('click', function(e) {
-                            e.stopPropagation();
-                            deleteRoom(this.dataset.room);
-                        });
-                    }
-                    div.onclick = (e) => {
-                        if (e.target.closest('.room-actions')) return;
-                        checkAndSwitchRoom(roomName);
-                    };
-                    document.getElementById('roomList').appendChild(div);
-                    const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                    window.history.pushState({ room: roomName }, '', window.location.origin + basePath + '/' +
-                        encodeURIComponent(roomName));
                 }
                 checkAndSwitchRoom(roomName);
             }
         }
 
+        // ===== 修复：删除房间广播给其他用户 =====
         async function deleteRoom(room) {
             if (room === '大厅') { alert('不能删除大厅'); return; }
             if (!confirm(`确认删除房间 "${room}" 及其所有消息？`)) return;
             try {
                 await db.from('messages').delete().eq('room', room);
-                document.querySelectorAll('.room-item').forEach(el => {
-                    if (el.textContent.includes(room)) el.remove();
-                });
+                // 广播删除事件
+                try {
+                    if (globalChannel) {
+                        await globalChannel.send({ type: 'broadcast', event: 'room_deleted', payload: { room: room } });
+                    }
+                } catch (broadcastErr) { console.warn('广播失败', broadcastErr); }
                 if (currentRoom === room) {
-                    const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                    window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath + '/');
                     checkAndSwitchRoom('大厅');
                 }
                 alert('✅ 房间已删除');
                 delete roomOwners[room];
                 currentRoomList = currentRoomList.filter(r => r !== room);
+                loadRooms();
             } catch (e) { alert('删除失败: ' + e.message); }
         }
 
         // ============================================================
-        // 消息系统（重写分页加载逻辑，修复 Bug）
+        // 消息系统
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -1269,10 +1069,11 @@
                 const trigger = document.createElement('div');
                 trigger.className = 'load-more-trigger';
                 trigger.id = 'loadMoreTrigger';
-                trigger.textContent = '⬆ 点击加载更早消息';
+                trigger.textContent = '⬆ 滚动加载更早消息';
                 trigger.onclick = loadMoreMessages;
-                trigger.style.display = 'block'; // 永远显示
+                trigger.style.display = 'block';
                 document.getElementById('chatMessages').appendChild(trigger);
+                setupLoadMoreObserver();
             }
 
             const trigger = document.getElementById('loadMoreTrigger');
@@ -1283,63 +1084,35 @@
             }
 
             try {
-                // 查询最新 PAGE_SIZE 条消息（降序）
                 const { data, error } = await db.from('messages')
-                    .select('*')
-                    .eq('room', room)
-                    .order('created_at', { ascending: false })
-                    .limit(PAGE_SIZE);
-
+                    .select('*').eq('room', room).order('created_at', { ascending: false }).limit(PAGE_SIZE);
                 if (error) { console.error('加载消息失败', error); return; }
 
                 if (data && data.length > 0) {
-                    // 反转为升序显示
                     const sorted = data.reverse();
-                    // 设置最早消息时间戳
                     oldestMessageCreatedAt = sorted[0].created_at;
-                    // 渲染消息（追加到末尾，保持 trigger 在顶部）
                     renderMessages(sorted);
                 }
 
-                // 判断是否还有更早消息
                 if (data && data.length < PAGE_SIZE) {
                     hasMoreMessages = false;
-                    if (trigger) {
-                        trigger.textContent = '—— 已加载全部消息 ——';
-                        trigger.className = 'load-more-trigger';
-                        trigger.style.display = 'block';
-                    }
+                    if (trigger) { trigger.textContent = '—— 已加载全部消息 ——'; trigger.className = 'load-more-trigger'; trigger.style.display = 'block'; }
                 } else {
-                    // 还有可能更多，检查是否真的还有更早消息
                     const { data: earlierCheck } = await db.from('messages')
-                        .select('id')
-                        .eq('room', room)
-                        .lt('created_at', oldestMessageCreatedAt || new Date().toISOString())
-                        .limit(1);
+                        .select('id').eq('room', room).lt('created_at', oldestMessageCreatedAt || new Date().toISOString()).limit(1);
                     if (earlierCheck && earlierCheck.length > 0) {
                         hasMoreMessages = true;
-                        if (trigger) {
-                            trigger.textContent = '⬆ 点击加载更早消息';
-                            trigger.className = 'load-more-trigger';
-                            trigger.style.display = 'block';
-                        }
+                        if (trigger) { trigger.textContent = '⬆ 滚动加载更早消息'; trigger.className = 'load-more-trigger'; trigger.style.display = 'block'; }
                     } else {
                         hasMoreMessages = false;
-                        if (trigger) {
-                            trigger.textContent = '—— 已加载全部消息 ——';
-                            trigger.className = 'load-more-trigger';
-                            trigger.style.display = 'block';
-                        }
+                        if (trigger) { trigger.textContent = '—— 已加载全部消息 ——'; trigger.className = 'load-more-trigger'; trigger.style.display = 'block'; }
                     }
                 }
-
-                // 滚动到底部（最新消息）
                 const container = document.getElementById('chatMessages');
                 container.scrollTop = container.scrollHeight;
             } catch (e) { console.error('加载消息异常', e); }
         }
 
-        // 渲染消息列表：直接追加到容器末尾
         function renderMessages(messages) {
             const container = document.getElementById('chatMessages');
             messages.forEach(msg => {
@@ -1353,25 +1126,16 @@
         function renderMessageToElement(div, msg) {
             const isSelf = msg.username === currentUser.username;
             const isSystem = msg.username === '🛡️ 系统';
-
-            if (isSystem) {
-                div.className = 'msg system-msg';
-            } else {
-                div.className = 'msg ' + (isSelf ? 'self' : 'other');
-            }
+            if (isSystem) div.className = 'msg system-msg';
+            else div.className = 'msg ' + (isSelf ? 'self' : 'other');
 
             const avatarUrl = getAvatarUrl(msg.username, msg.avatar);
             let contentHtml = '';
             if (msg.type === 'image') {
-                contentHtml =
-                    `<img src="${escapeHtml(msg.content)}" class="msg-img" onclick="window.open('${escapeHtml(msg.content)}','_blank')" />`;
+                contentHtml = `<img src="${escapeHtml(msg.content)}" class="msg-img" onclick="window.open('${escapeHtml(msg.content)}','_blank')" />`;
             } else if (msg.type === 'file') {
-                if (isValidUrl(msg.content)) {
-                    contentHtml =
-                        `<div>📄 <a href="${escapeHtml(msg.content)}" target="_blank" class="link-safe">查看文件</a></div>`;
-                } else {
-                    contentHtml = `<div>📄 文件链接无效</div>`;
-                }
+                if (isValidUrl(msg.content)) contentHtml = `<div>📄 <a href="${escapeHtml(msg.content)}" target="_blank" class="link-safe">查看文件</a></div>`;
+                else contentHtml = `<div>📄 文件链接无效</div>`;
             } else {
                 contentHtml = `<div class="msg-text">${safeLinkify(msg.content)}</div>`;
             }
@@ -1384,23 +1148,14 @@
                 <div class="msg-content">
                   <div class="msg-username">${escapeHtml(msg.username)}</div>
                   ${contentHtml}
-                  <div class="msg-time">
-                    ${timeStr}
-                    <span class="full-date">${fullDateStr}</span>
-                  </div>
+                  <div class="msg-time">${timeStr}<span class="full-date">${fullDateStr}</span></div>
                 </div>
-                ${!isSystem ? `
-                  <div class="msg-actions">
-                    <button class="report-btn" data-msgid="${msg.id}" data-username="${escapeHtml(msg.username)}">🚩</button>
-                    ${isSelf ? `<button class="delete-btn" data-msgid="${msg.id}">✕</button>` : ''}
-                  </div>
-                ` : ''}
-              `;
+                ${!isSystem ? `<div class="msg-actions"><button class="report-btn" data-msgid="${msg.id}" data-username="${escapeHtml(msg.username)}">🚩</button>${isSelf ? `<button class="delete-btn" data-msgid="${msg.id}">✕</button>` : ''}</div>` : ''}
+            `;
         }
 
         document.getElementById('chatMessages').addEventListener('click', async function(e) {
             const target = e.target;
-
             if (target.classList.contains('report-btn')) {
                 const msgId = target.dataset.msgid;
                 const username = target.dataset.username;
@@ -1408,22 +1163,13 @@
                     const reason = prompt('举报原因（选填）：');
                     if (reason !== null) {
                         try {
-                            await db.from('reports').insert({
-                                message_id: msgId,
-                                reported_user: username,
-                                reporter: currentUser.username,
-                                reason: reason || '未填写',
-                                created_at: new Date().toISOString()
-                            });
-                            alert('✅ 举报已提交，管理员会尽快处理。');
-                        } catch (err) {
-                            alert('举报提交失败：' + err.message);
-                        }
+                            await db.from('reports').insert({ message_id: msgId, reported_user: username, reporter: currentUser.username, reason: reason || '未填写', created_at: new Date().toISOString() });
+                            alert('✅ 举报已提交');
+                        } catch (err) { alert('举报提交失败：' + err.message); }
                     }
                 }
                 return;
             }
-
             if (target.classList.contains('delete-btn')) {
                 const msgId = target.dataset.msgid;
                 if (msgId && confirm('确认删除这条消息？')) {
@@ -1435,7 +1181,6 @@
                 }
                 return;
             }
-
             if (target.classList.contains('avatar') && target.dataset.action === 'profile') {
                 const username = target.dataset.username;
                 if (username) showProfile(username);
@@ -1443,7 +1188,6 @@
             }
         });
 
-        // ===== 核心：新消息直接追加到容器末尾 =====
         function renderMessage(msg) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
@@ -1452,7 +1196,22 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // 加载更早消息：插入到 trigger 之后，保持升序
+        // ===== 修复：滚动加载 =====
+        function setupLoadMoreObserver() {
+            if (loadMoreObserver) loadMoreObserver.disconnect();
+            const trigger = document.getElementById('loadMoreTrigger');
+            if (trigger) {
+                loadMoreObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && hasMoreMessages && !isLoadingMore) {
+                            loadMoreMessages();
+                        }
+                    });
+                }, { root: document.getElementById('chatMessages'), rootMargin: '100px' });
+                loadMoreObserver.observe(trigger);
+            }
+        }
+
         async function loadMoreMessages() {
             if (isLoadingMore || !hasMoreMessages) return;
             isLoadingMore = true;
@@ -1462,19 +1221,11 @@
             trigger.style.display = 'block';
 
             try {
-                let query = db.from('messages')
-                    .select('*')
-                    .eq('room', currentRoom)
-                    .order('created_at', { ascending: false })
-                    .limit(PAGE_SIZE);
-
-                if (oldestMessageCreatedAt) {
-                    query = query.lt('created_at', oldestMessageCreatedAt);
-                }
+                let query = db.from('messages').select('*').eq('room', currentRoom).order('created_at', { ascending: false }).limit(PAGE_SIZE);
+                if (oldestMessageCreatedAt) query = query.lt('created_at', oldestMessageCreatedAt);
 
                 const { data, error } = await query;
                 if (error) {
-                    console.error('加载更早消息失败', error);
                     isLoadingMore = false;
                     trigger.textContent = '⬆ 加载失败，点击重试';
                     trigger.className = 'load-more-trigger';
@@ -1483,11 +1234,10 @@
                 }
 
                 if (data && data.length > 0) {
-                    const sorted = data.reverse(); // 升序
+                    const sorted = data.reverse();
                     oldestMessageCreatedAt = sorted[0].created_at;
                     const container = document.getElementById('chatMessages');
                     const triggerEl = document.getElementById('loadMoreTrigger');
-                    // 插入到 trigger 之后、现有消息之前
                     const referenceNode = triggerEl.nextElementSibling;
                     sorted.forEach(msg => {
                         const div = document.createElement('div');
@@ -1500,7 +1250,7 @@
                         trigger.className = 'load-more-trigger';
                         trigger.style.display = 'block';
                     } else {
-                        trigger.textContent = '⬆ 点击加载更早消息';
+                        trigger.textContent = '⬆ 滚动加载更早消息';
                         trigger.className = 'load-more-trigger';
                         trigger.style.display = 'block';
                     }
@@ -1511,7 +1261,6 @@
                     trigger.style.display = 'block';
                 }
             } catch (e) {
-                console.error('加载更早消息异常', e);
                 trigger.textContent = '⬆ 加载失败，点击重试';
                 trigger.className = 'load-more-trigger';
                 trigger.style.display = 'block';
@@ -1521,20 +1270,12 @@
 
         function subscribeToMessages() {
             wsChannels = wsChannels.filter(ch => {
-                if (ch.topic && ch.topic.includes('public:messages')) {
-                    try { db.removeChannel(ch); } catch (_) {}
-                    return false;
-                }
+                if (ch.topic && ch.topic.includes('public:messages')) { try { db.removeChannel(ch); } catch (_) {} return false; }
                 return true;
             });
 
             const ch = db.channel('public:messages-' + currentRoom)
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: 'room=eq.' + currentRoom
-                }, payload => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'room=eq.' + currentRoom }, payload => {
                     const msg = payload.new;
                     if (msg.room === currentRoom) {
                         renderMessage(msg);
@@ -1558,51 +1299,46 @@
             if (!text || !currentUser.username) return;
 
             try {
-                const { data: userData } = await db.from('users')
-                    .select('is_banned')
-                    .eq('username', currentUser.username)
-                    .single();
-                if (userData && userData.is_banned) {
-                    alert('⛔ 你已被封禁，无法发送消息');
-                    logout();
-                    return;
-                }
-            } catch (_) {
-                alert('⛔ 网络异常，请稍后再试');
-                return;
-            }
+                const { data: userData } = await db.from('users').select('is_banned').eq('username', currentUser.username).single();
+                if (userData && userData.is_banned) { alert('⛔ 你已被封禁，无法发送消息'); logout(); return; }
+            } catch (_) { alert('⛔ 网络异常，请稍后再试'); return; }
 
-            if (containsBlockedText(text)) {
-                alert('⚠️ 消息包含违规内容，无法发送。');
-                return;
-            }
+            if (containsBlockedText(text)) { alert('⚠️ 消息包含违规内容，无法发送。'); return; }
+            if (text.length > 10000) { alert('⚠️ 消息过长，请控制在10000字符以内'); return; }
 
-            if (text.length > 10000) {
-                alert('⚠️ 消息过长，请控制在10000字符以内');
-                return;
-            }
-
+            // ===== 修复：AI 回复入库 + 传递上下文 =====
             if (text.startsWith('@ai ')) {
                 const prompt = text.slice(4);
                 input.value = '';
-                const userMsg = {
-                    username: currentUser.username,
-                    content: '@ai ' + prompt,
-                    type: 'text',
-                    avatar: currentUser.avatar,
-                    created_at: new Date().toISOString()
-                };
-                renderMessage(userMsg);
-                const reply = await askAI(prompt, '');
-                const aiMsg = {
-                    username: '🤖 AI助手',
-                    content: reply,
-                    type: 'text',
-                    avatar: '',
-                    created_at: new Date().toISOString()
-                };
-                renderMessage(aiMsg);
-                document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+
+                // 获取最近 20 条消息作为上下文
+                let context = '';
+                try {
+                    const { data: recentMsgs } = await db.from('messages')
+                        .select('username, content')
+                        .eq('room', currentRoom)
+                        .order('created_at', { ascending: false })
+                        .limit(20);
+                    if (recentMsgs) {
+                        context = recentMsgs.reverse().map(m => `${m.username}: ${m.content}`).join('\n');
+                    }
+                } catch (e) { console.warn('获取上下文失败', e); }
+
+                const reply = await askAI(prompt, context);
+
+                // 插入 AI 回复到数据库
+                try {
+                    await db.from('messages').insert({
+                        room: currentRoom,
+                        username: '🤖 AI助手',
+                        content: reply,
+                        type: 'text',
+                        avatar: '',
+                        room_owner: currentRoom !== '大厅' ? roomOwners[currentRoom] || currentUser.username : null,
+                        created_at: new Date().toISOString()
+                    });
+                } catch (insertErr) { console.warn('AI回复入库失败', insertErr); }
+
                 input.focus();
                 return;
             }
@@ -1626,24 +1362,17 @@
         // AI 集成（Kimi 优先，Hugging Face 备选）
         // ============================================================
         async function askAI(prompt, context) {
-            const truncatedContext = context ? context.substring(0, 200) : '';
-            const fullMsg = `你是星迹聊天室里的智能助手。请用简洁、友好的中文回答。\n聊天记录：${truncatedContext}\n用户：${prompt}`;
+            const truncatedContext = context ? context.substring(0, 1000) : '';
+            const fullMsg = `你是星迹聊天室的智能助手"星迹AI"。当前聊天室：${currentRoom}\n以下是最近聊天记录：\n${truncatedContext}\n\n用户 ${currentUser.username} 说：${prompt}\n请用简洁友好的中文回答。`;
 
-            // 1. 尝试 Kimi API
+            // 1. Kimi API
             try {
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 15000);
                 const res = await fetch('https://api.moonshot.cn/v1/chat/completions', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + KIMI_API_KEY
-                    },
-                    body: JSON.stringify({
-                        model: 'moonshot-v1-8k',
-                        messages: [{ role: 'user', content: fullMsg }],
-                        temperature: 0.7
-                    }),
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + KIMI_API_KEY },
+                    body: JSON.stringify({ model: 'moonshot-v1-8k', messages: [{ role: 'user', content: fullMsg }], temperature: 0.7 }),
                     signal: controller.signal
                 });
                 clearTimeout(timeout);
@@ -1651,11 +1380,9 @@
                 const data = await res.json();
                 const reply = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
                 if (reply) return reply;
-            } catch (e) {
-                console.warn('Kimi API 失败，尝试 Hugging Face');
-            }
+            } catch (e) { console.warn('Kimi API 失败，尝试 Hugging Face'); }
 
-            // 2. 降级到 Hugging Face
+            // 2. Hugging Face
             const hfToken = localStorage.getItem('hf_token');
             if (hfToken) {
                 try {
@@ -1663,10 +1390,7 @@
                     const timeout = setTimeout(() => controller.abort(), 15000);
                     const res = await fetch('https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct', {
                         method: 'POST',
-                        headers: {
-                            'Authorization': 'Bearer ' + hfToken,
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Authorization': 'Bearer ' + hfToken, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ inputs: fullMsg }),
                         signal: controller.signal
                     });
@@ -1676,14 +1400,10 @@
                     if (data && data.generated_text) {
                         return data.generated_text.replace(fullMsg, '').trim() || '（AI 返回为空）';
                     }
-                } catch (e) {
-                    console.warn('Hugging Face 调用失败');
-                }
-            } else {
-                return '🤖 需要配置 Hugging Face Token 才能使用 AI 备用服务。请访问 huggingface.co 注册并获取 token，然后在控制台输入 localStorage.setItem("hf_token","你的token")。';
+                } catch (e) { console.warn('Hugging Face 调用失败'); }
             }
 
-            // 3. 兜底回复
+            // 3. 兜底
             return '🌙 所有 AI 服务暂时不可用，请稍后再试。';
         }
 
@@ -1705,10 +1425,11 @@
             const trigger = document.createElement('div');
             trigger.className = 'load-more-trigger';
             trigger.id = 'loadMoreTrigger';
-            trigger.textContent = '⬆ 点击加载更早消息';
+            trigger.textContent = '⬆ 滚动加载更早消息';
             trigger.onclick = loadMoreMessages;
             trigger.style.display = 'block';
             document.getElementById('chatMessages').appendChild(trigger);
+            setupLoadMoreObserver();
             loadMessages(currentRoom, true);
         }
 
@@ -1718,27 +1439,19 @@
         document.getElementById('fileInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > 20 * 1024 * 1024) { alert('文件过大，请选择小于 20MB 的文件');
-                e.target.value = ''; return; }
+            if (file.size > 20 * 1024 * 1024) { alert('文件过大，请选择小于 20MB 的文件'); e.target.value = ''; return; }
             const reader = new FileReader();
             reader.onload = async (ev) => {
                 const base64 = ev.target.result;
                 const type = file.type.startsWith('image/') ? 'image' : 'file';
                 if (type === 'image') {
                     const isNsfw = await isImageNSFW(base64);
-                    if (isNsfw) {
-                        alert('🛡️ 图片审核未通过，可能包含不适宜内容。');
-                        return;
-                    }
+                    if (isNsfw) { alert('🛡️ 图片审核未通过，可能包含不适宜内容。'); return; }
                 }
                 try {
                     await db.from('messages').insert({
-                        room: currentRoom,
-                        username: currentUser.username,
-                        content: base64,
-                        type: type,
-                        avatar: currentUser.avatar || '',
-                        room_owner: currentRoom !== '大厅' ? roomOwners[currentRoom] || currentUser.username : null
+                        room: currentRoom, username: currentUser.username, content: base64, type: type,
+                        avatar: currentUser.avatar || '', room_owner: currentRoom !== '大厅' ? roomOwners[currentRoom] || currentUser.username : null
                     });
                     document.getElementById('messageInput').focus();
                 } catch (err) { alert('文件上传失败：' + err.message); }
@@ -1775,14 +1488,14 @@
         }
 
         // ============================================================
-        // 成员列表
+        // 成员列表（修复：5分钟窗口，点击头像发起通话）
         // ============================================================
         async function updateMemberList() {
-            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
             const { data } = await db.from('messages')
                 .select('username, avatar')
                 .eq('room', currentRoom)
-                .gte('created_at', oneHourAgo)
+                .gte('created_at', fiveMinutesAgo)
                 .order('created_at', { ascending: false })
                 .limit(50);
             const members = new Map();
@@ -1794,32 +1507,35 @@
             members.forEach((avatar, username) => {
                 const tag = document.createElement('span');
                 tag.className = 'member-tag';
-                tag.innerHTML =
-                    `<img class="avatar avatar-sm" src="${getAvatarUrl(username, avatar)}" /> ${escapeHtml(username)} <span class="online-dot"></span>`;
-                tag.title = '双击私聊 ' + username;
+                tag.innerHTML = `<img class="avatar avatar-sm" src="${getAvatarUrl(username, avatar)}" /> ${escapeHtml(username)} <span class="online-dot"></span>`;
+                tag.title = '点击查看 ' + username + ' · 双击私聊';
+                tag.onclick = () => showMemberActions(username);
                 tag.ondblclick = () => { if (username !== currentUser.username) openPrivateChat(username); };
                 list.appendChild(tag);
             });
+        }
+
+        // ===== 新增：点击成员显示操作菜单 =====
+        function showMemberActions(username) {
+            if (username === currentUser.username) return;
+            if (confirm(`对 ${username} 进行什么操作？\n\n确定=视频通话，取消=私聊`)) {
+                startCallTo(username);
+            } else {
+                openPrivateChat(username);
+            }
         }
 
         // ============================================================
         // 个人资料
         // ============================================================
         async function showProfile(username) {
-            const { data } = await db.from('users').select('username, avatar, signature, is_banned, last_login_at, last_device').eq('username',
-                username).single();
+            const { data } = await db.from('users').select('username, avatar, signature, is_banned, last_login_at, last_device').eq('username', username).single();
             if (data) {
                 const isBanned = data.is_banned || false;
-                const { data: recentMsgs } = await db.from('messages')
-                    .select('content, created_at')
-                    .eq('username', username)
-                    .order('created_at', { ascending: false })
-                    .limit(5);
+                const { data: recentMsgs } = await db.from('messages').select('content, created_at').eq('username', username).order('created_at', { ascending: false }).limit(5);
                 let recentHtml = '';
                 if (recentMsgs && recentMsgs.length > 0) {
-                    recentHtml = recentMsgs.map(m =>
-                        `<div style="font-size:0.8rem;color:var(--text-secondary);padding:2px 0;">${escapeHtml(m.content).substring(0,40)} <span style="font-size:0.6rem;color:var(--text-muted);">${formatTime(m.created_at)}</span></div>`
-                        ).join('');
+                    recentHtml = recentMsgs.map(m => `<div style="font-size:0.8rem;color:var(--text-secondary);padding:2px 0;">${escapeHtml(m.content).substring(0,40)} <span style="font-size:0.6rem;color:var(--text-muted);">${formatTime(m.created_at)}</span></div>`).join('');
                 }
                 document.getElementById('profileContent').querySelector('.modal-body').innerHTML = `
                     <div class="text-center">
@@ -1843,16 +1559,11 @@
         function openPrivateChat(target) {
             if (target === currentUser.username) return;
             privateTarget = target;
-
             wsChannels = wsChannels.filter(ch => {
                 const chName = ch.topic || ch.channelName || '';
-                if (chName.includes('private_messages')) {
-                    try { db.removeChannel(ch); } catch (_) {}
-                    return false;
-                }
+                if (chName.includes('private_messages')) { try { db.removeChannel(ch); } catch (_) {} return false; }
                 return true;
             });
-
             document.getElementById('privateChatTitle').textContent = '💬 私聊 · ' + target;
             document.getElementById('privateChatMessages').innerHTML = '';
             loadPrivateMessages(target);
@@ -1862,28 +1573,20 @@
         }
 
         async function loadPrivateMessages(target) {
-            const { data } = await db.from('private_messages').select('*').or(
-                `sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`).order('created_at', { ascending: true });
+            const { data } = await db.from('private_messages').select('*').or(`sender.eq.${currentUser.username},receiver.eq.${currentUser.username}`).order('created_at', { ascending: true });
             if (data) {
                 const box = document.getElementById('privateChatMessages');
                 box.innerHTML = '';
-                data.filter(m => (m.sender === currentUser.username && m.receiver === target) || (m.sender === target && m
-                    .receiver === currentUser.username)).forEach(m => appendPrivateMessage(m, m.sender === currentUser
-                    .username));
+                data.filter(m => (m.sender === currentUser.username && m.receiver === target) || (m.sender === target && m.receiver === currentUser.username)).forEach(m => appendPrivateMessage(m, m.sender === currentUser.username));
                 box.scrollTop = box.scrollHeight;
             }
         }
 
         function subscribePrivateMessages() {
             const ch = db.channel('private_messages-' + currentUser.username + '-' + privateTarget)
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'private_messages'
-                }, payload => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, payload => {
                     const msg = payload.new;
-                    if ((msg.sender === currentUser.username && msg.receiver === privateTarget) || (msg.sender ===
-                            privateTarget && msg.receiver === currentUser.username)) {
+                    if ((msg.sender === currentUser.username && msg.receiver === privateTarget) || (msg.sender === privateTarget && msg.receiver === currentUser.username)) {
                         appendPrivateMessage(msg, msg.sender === currentUser.username);
                         const box = document.getElementById('privateChatMessages');
                         if (box) box.scrollTop = box.scrollHeight;
@@ -1900,8 +1603,7 @@
             if (!text || !privateTarget) return;
             if (containsBlockedText(text)) { alert('⚠️ 消息包含违规内容，无法发送。'); return; }
             try {
-                await db.from('private_messages').insert({ sender: currentUser.username, receiver: privateTarget,
-                    content: text });
+                await db.from('private_messages').insert({ sender: currentUser.username, receiver: privateTarget, content: text });
                 input.value = '';
                 input.focus();
             } catch (err) { alert('私聊发送失败：' + err.message); }
@@ -1920,10 +1622,7 @@
                 <div class="msg-content">
                   ${!isSelf ? `<div class="msg-username">${escapeHtml(msg.sender)}</div>` : ''}
                   <div class="msg-text">${escapeHtml(msg.content)}</div>
-                  <div class="msg-time">
-                    ${timeStr}
-                    <span class="full-date">${fullDateStr}</span>
-                  </div>
+                  <div class="msg-time">${timeStr}<span class="full-date">${fullDateStr}</span></div>
                 </div>`;
             box.appendChild(div);
         }
@@ -1935,8 +1634,7 @@
             const panel = document.getElementById('emojiPanel');
             if (panel.style.display === 'block') { panel.style.display = 'none'; } else {
                 panel.style.display = 'block';
-                document.getElementById('emojiGrid').innerHTML = emojis.map(e =>
-                    `<span onclick="insertEmoji('${e}')">${e}</span>`).join('');
+                document.getElementById('emojiGrid').innerHTML = emojis.map(e => `<span onclick="insertEmoji('${e}')">${e}</span>`).join('');
             }
         }
 
@@ -1945,20 +1643,22 @@
             const isPrivateOpen = privateModal.classList.contains('active') && privateModal.style.display !== 'none';
             if (isPrivateOpen) {
                 const privateInput = document.getElementById('privateChatInput');
-                privateInput.value += emoji;
-                privateInput.focus();
+                privateInput.value += emoji; privateInput.focus();
             } else {
                 const mainInput = document.getElementById('messageInput');
-                mainInput.value += emoji;
-                mainInput.focus();
+                mainInput.value += emoji; mainInput.focus();
             }
         }
 
         // ============================================================
-        // 视频通话
+        // 视频通话（修复：从成员列表发起，不再使用 prompt）
         // ============================================================
-        async function startCall() {
+        function startCallFromInput() {
             const target = prompt('📞 输入对方用户名：');
+            if (target && target !== currentUser.username) startCallTo(target);
+        }
+
+        async function startCallTo(target) {
             if (!target || target === currentUser.username) return;
             callTarget = target;
             try {
@@ -1969,29 +1669,24 @@
                 pc = new RTCPeerConnection();
                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
                 pc.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-                pc.onicecandidate = (e) => { if (e.candidate) db.from('calls').insert({ sender: currentUser.username,
-                        receiver: target, type: 'ice', data: e.candidate }); };
+                pc.onicecandidate = (e) => { if (e.candidate) db.from('calls').insert({ sender: currentUser.username, receiver: target, type: 'ice', data: e.candidate }); };
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                db.from('calls').insert({ sender: currentUser.username, receiver: target, type: 'offer', data: offer });
+                await db.from('calls').insert({ sender: currentUser.username, receiver: target, type: 'offer', data: offer, created_at: new Date().toISOString() });
             } catch (_) { alert('无法访问摄像头/麦克风，请检查权限设置。'); }
         }
 
+        function startCall() { startCallFromInput(); }
+
         function subscribeCalls() {
             const ch = db.channel('public:calls-' + currentUser.username)
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'calls',
-                    filter: 'receiver=eq.' + currentUser.username
-                }, async payload => {
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: 'receiver=eq.' + currentUser.username }, async payload => {
                     const msg = payload.new;
                     if (msg.receiver !== currentUser.username) return;
                     try {
                         if (msg.type === 'offer') {
                             if (!confirm('📞 ' + msg.sender + ' 邀请你视频通话，是否接听？')) {
-                                db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender,
-                                    type: 'hangup', data: {} });
+                                await db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender, type: 'hangup', data: {}, created_at: new Date().toISOString() });
                                 return;
                             }
                             pc = new RTCPeerConnection();
@@ -1999,19 +1694,19 @@
                             document.getElementById('localVideo').srcObject = localStream;
                             localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
                             pc.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-                            pc.onicecandidate = (e) => { if (e.candidate) db.from('calls').insert({ sender: currentUser
-                                    .username, receiver: msg.sender, type: 'ice', data: e.candidate }); };
+                            pc.onicecandidate = (e) => { if (e.candidate) db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender, type: 'ice', data: e.candidate, created_at: new Date().toISOString() }); };
                             await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
                             const answer = await pc.createAnswer();
                             await pc.setLocalDescription(answer);
-                            db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender,
-                                type: 'answer', data: answer });
+                            await db.from('calls').insert({ sender: currentUser.username, receiver: msg.sender, type: 'answer', data: answer, created_at: new Date().toISOString() });
                             document.getElementById('videoCallModal').classList.add('active');
                             document.getElementById('videoCallModal').style.display = 'flex';
                             callTarget = msg.sender;
-                        } else if (msg.type === 'answer') { if (pc) await pc.setRemoteDescription(new
-                                RTCSessionDescription(msg.data)); } else if (msg.type === 'ice') { if (pc) await pc
-                                .addIceCandidate(new RTCIceCandidate(msg.data)); } else if (msg.type === 'hangup') {
+                        } else if (msg.type === 'answer') {
+                            if (pc) await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+                        } else if (msg.type === 'ice') {
+                            if (pc) await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                        } else if (msg.type === 'hangup') {
                             alert(msg.sender + ' 已挂断通话');
                             hangUp();
                         }
@@ -2022,12 +1717,11 @@
         }
 
         function hangUp() {
-            if (callTarget) db.from('calls').insert({ sender: currentUser.username, receiver: callTarget, type: 'hangup',
-                data: {} });
-            if (pc) { pc.close();
-                pc = null; }
-            if (localStream) { localStream.getTracks().forEach(t => t.stop());
-                localStream = null; }
+            if (callTarget) {
+                try { db.from('calls').insert({ sender: currentUser.username, receiver: callTarget, type: 'hangup', data: {}, created_at: new Date().toISOString() }); } catch (_) {}
+            }
+            if (pc) { pc.close(); pc = null; }
+            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
             const remoteVideo = document.getElementById('remoteVideo');
             const localVideo = document.getElementById('localVideo');
             if (remoteVideo) remoteVideo.srcObject = null;
@@ -2042,51 +1736,34 @@
         // ============================================================
         function toggleTheme() {
             document.body.classList.toggle('light');
-            try {
-                localStorage.setItem('starry_theme', document.body.classList.contains('light') ? 'light' : 'dark');
-            } catch (_) {}
+            try { localStorage.setItem('starry_theme', document.body.classList.contains('light') ? 'light' : 'dark'); } catch (_) {}
         }
-
-        function toggleSound() { soundEnabled = !soundEnabled;
-            document.getElementById('soundToggle').textContent = soundEnabled ? '🔔' : '🔕'; }
-
-        try {
-            const savedTheme = localStorage.getItem('starry_theme');
-            if (savedTheme === 'light') document.body.classList.add('light');
-        } catch (_) {}
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundToggle').textContent = soundEnabled ? '🔔' : '🔕';
+        }
+        try { if (localStorage.getItem('starry_theme') === 'light') document.body.classList.add('light'); } catch (_) {}
 
         // ============================================================
-        // 键盘事件 + 历史路由
+        // 键盘事件
         // ============================================================
         document.getElementById('messageInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.isComposing && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+            if (e.key === 'Enter' && !e.isComposing && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         document.getElementById('privateChatInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.isComposing) {
-                e.preventDefault();
-                sendPrivateMessage();
-            }
+            if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendPrivateMessage(); }
         });
-        document.querySelectorAll('.modal-overlay').forEach(overlay => { overlay.addEventListener('click', (e) => { if (e
-                .target === overlay) { overlay.classList.remove('active');
-                overlay.style.display = 'none'; } }); });
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.classList.remove('active'); overlay.style.display = 'none'; } });
+        });
 
         window.addEventListener('popstate', function(event) {
             const room = event.state?.room;
             if (room && room !== currentRoom) {
-                if (room === '大厅') {
-                    checkAndSwitchRoom('大厅');
-                } else {
+                if (room === '大厅') { checkAndSwitchRoom('大厅'); } else {
                     db.from('messages').select('room').eq('room', room).limit(1).then(({ data }) => {
-                        if (data && data.length > 0) {
-                            checkAndSwitchRoom(room);
-                        } else {
-                            const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
-                            window.history.pushState({ room: '大厅' }, '', window.location.origin + basePath +
-                            '/');
+                        if (data && data.length > 0) { checkAndSwitchRoom(room); } else {
+                            window.history.pushState({ room: '大厅' }, '', '/starrychat/');
                             checkAndSwitchRoom('大厅');
                         }
                     });
