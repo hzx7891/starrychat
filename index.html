@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
+    <!-- 新增：canonical 链接 -->
+    <link rel="canonical" href="https://hzx7891.github.io/starrychat/" />
     <meta name="description" content="星迹 StarryChat，开源实时在线聊天室平台，在这里聊天交友，查看用户协议、隐私政策与社区公约。">
     <meta name="msvalidate.01" content="50952A0872848F81774960881A2F8F292" />
     <meta charset="UTF-8" />
@@ -127,6 +129,36 @@
         .auth-box .legal-text a:hover { text-decoration: underline; }
         .remember-row { display: flex; align-items: center; gap: 10px; margin: 6px 0 18px; color: var(--text-secondary); font-size: 0.9rem; cursor: pointer; }
         .remember-row input[type="checkbox"] { accent-color: var(--primary); width: 18px; height: 18px; cursor: pointer; }
+
+        /* ===== 新增：第三方登录分隔线 + OAuth 按钮 ===== */
+        .oauth-divider {
+            display: flex; align-items: center; gap: 10px;
+            margin: 20px 0 14px; color: var(--text-muted);
+            font-size: 0.72rem; line-height: 1; white-space: nowrap;
+        }
+        .oauth-divider::before,
+        .oauth-divider::after {
+            content: ''; flex: 1; height: 1px; background: var(--border-color);
+        }
+        .oauth-btn {
+            width: 100%;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding: 11px 18px; margin-bottom: 10px;
+            border-radius: var(--radius-full);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-family: var(--font);
+            font-size: 0.9rem; font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            backdrop-filter: blur(12px);
+        }
+        .oauth-btn:hover:not(:disabled) { background: var(--bg-surface-hover); transform: translateY(-2px); }
+        .oauth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .oauth-btn svg { flex-shrink: 0; }
+        .oauth-btn.oauth-github:hover:not(:disabled) { border-color: #6e5494; box-shadow: 0 0 0 3px rgba(110, 84, 148, 0.18); }
+        .oauth-btn.oauth-microsoft:hover:not(:disabled) { border-color: #0078d4; box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.18); }
 
         /* ===== 签名页 ===== */
         #signaturePage { position: fixed; inset: 0; background: var(--bg-primary); display: none; justify-content: center; align-items: center; z-index: 1001; padding: 20px; }
@@ -338,6 +370,25 @@
             <button class="btn btn-primary" id="loginBtn" onclick="login()">登录</button>
             <div class="switch" onclick="showRegister()">还没有账号？注册 →</div>
             <div id="loginError" class="error"></div>
+
+            <!-- 新增：第三方登录分隔线 + OAuth 按钮 -->
+            <div class="oauth-divider"><span>或使用第三方账号</span></div>
+            <button class="oauth-btn oauth-github" onclick="signInWithGitHub()" type="button">
+                <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                使用 GitHub 登录
+            </button>
+            <button class="oauth-btn oauth-microsoft" type="button" disabled title="微软登录暂未开放">
+                <svg viewBox="0 0 23 23" width="18" height="18" aria-hidden="true">
+                    <path fill="#f25022" d="M0 0h10.5v10.5H0z"/>
+                    <path fill="#7fba00" d="M12.5 0H23v10.5H12.5z"/>
+                    <path fill="#00a4ef" d="M0 12.5h10.5V23H0z"/>
+                    <path fill="#ffb900" d="M12.5 12.5H23V23H12.5z"/>
+                </svg>
+                微软账号登录
+            </button>
+
             <div class="legal-text">
                 登录注册即表示你同意
                 <a href="terms.html" target="_blank">《用户协议》</a>
@@ -354,6 +405,25 @@
             <button class="btn btn-primary" id="regBtn" onclick="register()">注册</button>
             <div class="switch" onclick="showLogin()">已有账号？返回登录</div>
             <div id="regError" class="error"></div>
+
+            <!-- 新增：第三方登录分隔线 + OAuth 按钮 -->
+            <div class="oauth-divider"><span>或使用第三方账号</span></div>
+            <button class="oauth-btn oauth-github" onclick="signInWithGitHub()" type="button">
+                <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                使用 GitHub 登录
+            </button>
+            <button class="oauth-btn oauth-microsoft" type="button" disabled title="微软登录暂未开放">
+                <svg viewBox="0 0 23 23" width="18" height="18" aria-hidden="true">
+                    <path fill="#f25022" d="M0 0h10.5v10.5H0z"/>
+                    <path fill="#7fba00" d="M12.5 0H23v10.5H12.5z"/>
+                    <path fill="#00a4ef" d="M0 12.5h10.5V23H0z"/>
+                    <path fill="#ffb900" d="M12.5 12.5H23V23H12.5z"/>
+                </svg>
+                微软账号登录
+            </button>
+
             <div class="legal-text">
                 登录注册即表示你同意
                 <a href="terms.html" target="_blank">《用户协议》</a>
@@ -451,7 +521,7 @@
     <script>
         // ============================================================
         // 星迹 StarryChat - 完整 JavaScript
-        // 包含：配置、工具函数、认证、路由、消息、实时订阅、
+        // 包含：配置、工具函数、认证、OAuth、路由、消息、实时订阅、
         //       房间管理、AI集成、视频通话、表情、搜索、主题等
         // ============================================================
 
@@ -459,7 +529,7 @@
         const SUPABASE_URL = 'https://nzgnqwcsgnqjffydnxtz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_igxAfIfC7M4n6SYJKkqQRA_Cj2V0ba9';
         const API_NINJAS_KEY = '10dxzeBAfkw8GU2FqFi7aPPpLbODvq5r5cANzCEV';
-        const KIMI_API_KEY = 'sk-dQSot7cOHnhgSfehTEIPBlNz22OjcPULqLR61ThIqLM9J5hR';
+        // 安全清理：已删除 Kimi API Key
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -473,6 +543,9 @@
         let pc = null;
         let callTarget = '';
         let isAdmin = false;
+
+        // 新增：OAuth 处理标记，防止同一用户重复处理
+        let _oauthProcessedUserId = null;
 
         // 分页
         let currentPage = 0;
@@ -503,20 +576,14 @@
         function sha256(str) { return CryptoJS.SHA256(str).toString(); }
         const FIXED_SALT = 'StarryChat_2024';
 
-        // ===== 修复：密码验证支持 6 种哈希方式 =====
+        // 密码验证支持 6 种哈希方式
         function verifyPassword(inputPassword, storedHash) {
             if (!inputPassword || !storedHash) return false;
-            // 1. 固定盐：StarryChat_2024 + password + StarryChat_2024
             if (sha256(FIXED_SALT + inputPassword + FIXED_SALT) === storedHash) return true;
-            // 2. 无盐：sha256(password)
             if (sha256(inputPassword) === storedHash) return true;
-            // 3. 空盐：sha256('' + password + '')
             if (sha256('' + inputPassword + '') === storedHash) return true;
-            // 4. 盐前缀：StarryChat_2024 + password
             if (sha256(FIXED_SALT + inputPassword) === storedHash) return true;
-            // 5. 盐后缀：password + StarryChat_2024
             if (sha256(inputPassword + FIXED_SALT) === storedHash) return true;
-            // 6. 双重哈希：sha256(sha256(password))
             if (sha256(sha256(inputPassword)) === storedHash) return true;
             return false;
         }
@@ -572,7 +639,7 @@
         function closeModal(id) { const el = document.getElementById(id); el.classList.remove('active'); el.style.display = 'none'; }
         function openModal(id) { const el = document.getElementById(id); el.style.display = 'flex'; requestAnimationFrame(() => el.classList.add('active')); }
 
-        // ===== 修复：头像渲染，处理特殊字符、AI助手、系统 =====
+        // 头像渲染，处理特殊字符、AI助手、系统
         function getAvatarUrl(username, avatar) {
             if (avatar) return avatar;
             if (username === '🛡️ 系统') {
@@ -582,14 +649,12 @@
                 return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%236C5CE7"/%3E%3Ctext x="50" y="72" font-size="50" text-anchor="middle" fill="white" font-family="system-ui"%3E🤖%3C/text%3E%3C/svg%3E';
             }
             const safeName = (username || '?').trim();
-            // 尝试找到第一个字母、数字或中文
             let firstChar = '?';
             const match = safeName.match(/[A-Za-z0-9\u4e00-\u9fa5]/);
             if (match) firstChar = match[0];
             else if (safeName.length > 0) firstChar = safeName[0];
             const upper = firstChar.toUpperCase();
             const safeInitial = upper.replace(/[^A-Za-z0-9\u4e00-\u9fa5]/g, '') || '?';
-            // 对中文等字符做 URI 编码保护
             const encodedChar = encodeURIComponent(safeInitial);
             return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C5CE7'/%3E%3Cstop offset='100%25' stop-color='%2300B894'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='50' fill='url(%23a)'/%3E%3Ctext x='50' y='68' font-size='44' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'%3E${encodedChar}%3C/text%3E%3C/svg%3E`;
         }
@@ -612,6 +677,7 @@
         function runTypeWriter() {
             const textEl = document.getElementById('typewriterText');
             const emojiEl = document.getElementById('typewriterEmoji');
+            if (!textEl || !emojiEl) return;
             let textIndex = 0;
             emojiEl.textContent = welcomeEmojis[0];
             function typeWithText(text) {
@@ -634,10 +700,9 @@
         }
 
         // ============================================================
-        // 路由检测（修复：正确解析 URL，支持 /starrychat/ 前缀）
+        // 路由检测（正确解析 URL，支持 /starrychat/ 前缀）
         // ============================================================
         function detectRoomFromURL() {
-            // 优先从 search 参数读取 path（404.html 重定向带来）
             const searchParams = new URLSearchParams(location.search);
             let path = searchParams.get('path') || '';
             if (path) {
@@ -649,7 +714,6 @@
                     if (roomName && roomName !== 'index.html' && !roomName.includes('.')) return roomName;
                 }
             }
-            // 从 pathname 解析
             let pathname = window.location.pathname;
             if (pathname.startsWith('/starrychat/')) pathname = pathname.substring('/starrychat/'.length);
             else if (pathname.startsWith('/')) pathname = pathname.substring(1);
@@ -663,14 +727,185 @@
         }
 
         // ============================================================
+        // 新增：GitHub OAuth 登录
+        // ============================================================
+        function signInWithGitHub() {
+            if (checkMaintenance()) return;
+            try {
+                const { error } = db.auth.signInWithOAuth({
+                    provider: 'github',
+                    options: {
+                        redirectTo: 'https://hzx7891.github.io/starrychat/',
+                        scopes: 'read:user user:email'
+                    }
+                });
+                if (error) alert('GitHub 登录失败：' + error.message);
+            } catch (e) {
+                alert('GitHub 登录失败：' + (e && e.message ? e.message : e));
+            }
+        }
+        window.signInWithGitHub = signInWithGitHub;
+
+        // 新增：清理 URL 中的 access_token 哈希
+        function cleanOAuthHash() {
+            if (window.location.hash && window.location.hash.includes('access_token')) {
+                window.history.replaceState({}, '', window.location.pathname + window.location.search);
+            }
+        }
+
+        // 新增：用户名净化（去掉空格与非法字符，限长 24）
+        function sanitizeOAuthUsername(raw) {
+            let name = String(raw == null ? '' : raw);
+            name = name.replace(/\s+/g, '');
+            name = name.replace(/[^A-Za-z0-9_\-\u4e00-\u9fa5]/g, '');
+            name = name.slice(0, 24);
+            if (!name) name = 'user';
+            return name;
+        }
+
+        // 新增：处理 OAuth 回跳，返回 true 表示已成功接管登录流程
+        async function handleOAuthCallback() {
+            // 1. 清理 URL 里的 access_token 哈希
+            cleanOAuthHash();
+
+            // 2. 拿 session
+            let session = null;
+            try {
+                const res = await db.auth.getSession();
+                session = res && res.data ? res.data.session : null;
+            } catch (e) {
+                console.warn('获取 OAuth session 失败', e);
+            }
+            if (!session || !session.user) return false;
+
+            const user = session.user;
+
+            // 防止重复处理同一个用户
+            if (_oauthProcessedUserId === user.id) return true;
+            _oauthProcessedUserId = user.id;
+
+            // 3. 查询 users 表是否已有 auth_id = session.user.id 的记录
+            let record = null;
+            try {
+                const { data } = await db.from('users').select('*').eq('auth_id', user.id).maybeSingle();
+                record = data || null;
+            } catch (e) {
+                console.warn('按 auth_id 查询用户失败', e);
+            }
+
+            // 4. 没有则创建新账号（🔒 安全策略：绝不自动绑定已有账号）
+            if (!record) {
+                const meta = user.user_metadata || {};
+                const rawName = meta.user_name || meta.preferred_username || meta.name ||
+                    (user.email ? String(user.email).split('@')[0] : '') || 'user';
+                const baseName = sanitizeOAuthUsername(rawName);
+
+                const placeholderHash = sha256('oauth_' + user.id + '_' + Date.now());
+                const avatarUrl = meta.avatar_url || '';
+
+                let finalName = null;
+
+                // 依次尝试 baseName, baseName_1, baseName_2 ...
+                // 🔒 安全策略：无论同名账号有没有绑过 OAuth，一律不自动绑定，直接换后缀
+                for (let i = 0; i <= 99; i++) {
+                    const tryName = (i === 0) ? baseName : (baseName + '_' + i);
+                    let existing = null;
+                    try {
+                        const { data } = await db.from('users')
+                            .select('username').eq('username', tryName).maybeSingle();
+                        existing = data || null;
+                    } catch (e) {
+                        console.warn('检查用户名失败', e);
+                    }
+                    if (!existing) { finalName = tryName; break; }
+                }
+                if (!finalName) finalName = baseName + '_' + Date.now().toString().slice(-4);
+
+                // 🔒 只创建新账号，绝不自动绑定已有账号（防止 OAuth 账号劫持）
+                try {
+                    await db.from('users').insert({
+                        username: finalName,
+                        password_hash: placeholderHash,
+                        avatar: avatarUrl,
+                        signature: '',
+                        is_banned: false,
+                        auth_id: user.id,
+                        oauth_provider: 'github',
+                        email: user.email || null
+                    });
+                } catch (e) {
+                    console.warn('创建 OAuth 用户失败', e);
+                }
+
+                // 重新读取记录
+                try {
+                    const { data } = await db.from('users').select('*').eq('auth_id', user.id).maybeSingle();
+                    record = data || null;
+                } catch (e) {
+                    console.warn('重新读取 OAuth 用户失败', e);
+                }
+                if (!record) {
+                    record = {
+                        username: finalName,
+                        avatar: avatarUrl,
+                        signature: '',
+                        is_banned: false
+                    };
+                }
+            }
+
+            // 5. 封禁检查
+            if (record.is_banned) {
+                alert('⛔ 账号已被封禁：' + (record.ban_reason || '违规操作'));
+                try { await db.auth.signOut(); } catch (_) {}
+                _oauthProcessedUserId = null;
+                return false;
+            }
+
+            // 6. 设置 currentUser
+            currentUser = {
+                username: record.username,
+                avatar: record.avatar || '',
+                signature: record.signature || ''
+            };
+            isAdmin = currentUser.username === 'hzx7891';
+
+            // 更新登录日志（与密码登录保持一致，写入 login_logs）
+            try {
+                const deviceInfo = navigator.userAgent || '未知设备';
+                await db.from('login_logs').insert({
+                    username: currentUser.username,
+                    device: deviceInfo,
+                    created_at: new Date().toISOString()
+                });
+                await db.from('users').update({
+                    last_login_at: new Date().toISOString(),
+                    last_device: deviceInfo
+                }).eq('username', currentUser.username);
+            } catch (_) {}
+
+            // 7. 签名为空则强制进入签名设置页
+            if (!currentUser.signature) {
+                showSignaturePage();
+                return true;
+            }
+
+            // 8. 否则直接进入聊天室
+            enterChat();
+            return true;
+        }
+
+        // ============================================================
         // 个性化签名
         // ============================================================
         function showSignaturePage() {
             document.getElementById('welcomePage').style.display = 'none';
+            document.getElementById('authPage').style.display = 'none';
             document.getElementById('signaturePage').style.display = 'flex';
             if (currentUser.username) {
                 document.getElementById('signatureInput').value = currentUser.signature || '';
-                if (currentUser.avatar) document.getElementById('sigAvatarPreview').src = currentUser.avatar;
+                document.getElementById('sigAvatarPreview').src =
+                    currentUser.avatar || getAvatarUrl(currentUser.username, '');
             }
         }
 
@@ -691,10 +926,16 @@
 
         async function saveSignatureAndEnter() {
             const sig = document.getElementById('signatureInput').value.trim();
+
+            // 新增：签名为空不允许跳过
+            if (!sig) { alert('请填写个性签名～'); return; }
+
             if (currentUser.username) {
                 const updates = { signature: sig };
                 if (currentUser._tempAvatar) updates.avatar = currentUser._tempAvatar;
-                await db.from('users').update(updates).eq('username', currentUser.username);
+                try {
+                    await db.from('users').update(updates).eq('username', currentUser.username);
+                } catch (e) { console.warn('保存签名失败', e); }
                 if (updates.avatar) currentUser.avatar = updates.avatar;
                 currentUser.signature = sig;
             }
@@ -839,13 +1080,26 @@
             }
         }
 
-        // ===== 修复：记住我自动登录，放宽设备检查 =====
+        // ===== 自动登录：优先 OAuth session，其次 remember_token =====
         async function autoLogin() {
             if (checkMaintenance()) {
                 document.getElementById('welcomePage').style.display = 'flex';
                 runTypeWriter();
                 return;
             }
+
+            // 新增：先检查 OAuth session
+            try {
+                const { data } = await db.auth.getSession();
+                if (data && data.session && data.session.user) {
+                    const ok = await handleOAuthCallback();
+                    if (ok) return;
+                }
+            } catch (e) {
+                console.warn('检查 OAuth 会话失败', e);
+            }
+
+            // 原逻辑：检查 localStorage 里的 starry_remember token
             const savedToken = localStorage.getItem('starry_remember');
             if (savedToken) {
                 try {
@@ -854,7 +1108,6 @@
                         .eq('remember_token', savedToken).single();
                     if (data && !error && data.remember_expires && new Date(data.remember_expires).getTime() > Date.now()) {
                         const savedDevice = localStorage.getItem('starry_device');
-                        // 只在两个值都存在且不匹配时拒绝
                         if (data.remember_device && savedDevice && data.remember_device !== savedDevice) {
                             localStorage.removeItem('starry_remember');
                             localStorage.removeItem('starry_device');
@@ -885,7 +1138,7 @@
         }
 
         // ============================================================
-        // 进入聊天（修复：正确初始化所有模块）
+        // 进入聊天
         // ============================================================
         function enterChat() {
             document.getElementById('authPage').style.display = 'none';
@@ -909,7 +1162,7 @@
             setTimeout(() => { document.getElementById('messageInput').focus(); }, 300);
         }
 
-        // ===== 修复：URL 路由，固定 /starrychat/ 前缀 =====
+        // ===== URL 路由，固定 /starrychat/ 前缀 =====
         async function checkAndSwitchRoom(roomName) {
             try {
                 const { data } = await db.from('messages').select('room').eq('room', roomName).limit(1);
@@ -924,7 +1177,6 @@
 
                     document.getElementById('chatRoomName').textContent = roomName === '大厅' ? '🏠 大厅' : '🔒 ' + roomName;
 
-                    // 更新 URL：使用 /starrychat/ 前缀
                     const basePath = '/starrychat';
                     const newUrl = roomName !== '大厅' ? basePath + '/' + encodeURIComponent(roomName) : basePath + '/';
                     window.history.pushState({ room: roomName }, '', newUrl);
@@ -933,7 +1185,6 @@
                         el.classList.toggle('active', el.textContent.includes(roomName));
                     });
 
-                    // 清除残留的 path 参数
                     const url = new URL(window.location);
                     if (url.searchParams.has('path')) {
                         url.searchParams.delete('path');
@@ -1000,7 +1251,6 @@
                 .subscribe();
         }
 
-        // ===== 修复：删除房间广播 =====
         function setupGlobalChannel() {
             if (globalChannel) { try { db.removeChannel(globalChannel); } catch (_) {} }
             globalChannel = db.channel('global-updates');
@@ -1016,7 +1266,6 @@
                 .subscribe();
         }
 
-        // ===== 修复：成员刷新 30秒 =====
         function startMemberRefresh() {
             if (memberRefreshInterval) clearInterval(memberRefreshInterval);
             memberRefreshInterval = setInterval(() => { updateMemberList(); }, 30000);
@@ -1031,6 +1280,11 @@
             hangUp();
             currentUser = { username: '', avatar: '', signature: '' };
             isAdmin = false;
+
+            // 新增：退出 Supabase OAuth 会话 + 重置 OAuth 处理标记
+            try { db.auth.signOut(); } catch (_) {}
+            _oauthProcessedUserId = null;
+
             localStorage.removeItem('starry_remember');
             localStorage.removeItem('starry_device');
             document.getElementById('chatApp').style.display = 'none';
@@ -1099,13 +1353,11 @@
             }
         }
 
-        // ===== 修复：删除房间广播给其他用户 =====
         async function deleteRoom(room) {
             if (room === '大厅') { alert('不能删除大厅'); return; }
             if (!confirm(`确认删除房间 "${room}" 及其所有消息？`)) return;
             try {
                 await db.from('messages').delete().eq('room', room);
-                // 广播删除事件
                 try {
                     if (globalChannel) {
                         await globalChannel.send({ type: 'broadcast', event: 'room_deleted', payload: { room: room } });
@@ -1122,7 +1374,7 @@
         }
 
         // ============================================================
-        // 消息系统（修复：滚动加载、分页正确、trigger 永不隐藏）
+        // 消息系统
         // ============================================================
         async function loadMessages(room, reset = true) {
             if (reset) {
@@ -1260,10 +1512,8 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // ===== 修复：滚动加载使用容器 scroll 事件 =====
         function setupScrollLoadMore() {
             const container = document.getElementById('chatMessages');
-            // 移除之前的监听
             if (window._loadMoreScrollHandler) {
                 container.removeEventListener('scroll', window._loadMoreScrollHandler);
             }
@@ -1354,7 +1604,7 @@
         }
 
         // ============================================================
-        // 发送消息（修复：AI 入库、上下文）
+        // 发送消息
         // ============================================================
         async function sendMessage() {
             const input = document.getElementById('messageInput');
@@ -1373,7 +1623,6 @@
                 const prompt = text.slice(4);
                 input.value = '';
 
-                // 获取最近 20 条消息作为上下文
                 let context = '';
                 try {
                     const { data: recentMsgs } = await db.from('messages')
@@ -1388,7 +1637,6 @@
 
                 const reply = await askAI(prompt, context);
 
-                // AI 回复入库
                 try {
                     await db.from('messages').insert({
                         room: currentRoom,
@@ -1421,30 +1669,12 @@
         }
 
         // ============================================================
-        // AI 集成（Kimi 优先，Hugging Face 备选，含上下文）
+        // AI 集成（安全清理：已移除 Kimi，仅保留 Hugging Face + 兜底）
         // ============================================================
         async function askAI(prompt, context) {
             const truncatedContext = context ? context.substring(0, 1000) : '';
             const fullMsg = `你是星迹聊天室的智能助手"星迹AI"。当前聊天室：${currentRoom}\n以下是最近聊天记录：\n${truncatedContext}\n\n用户 ${currentUser.username} 说：${prompt}\n请用简洁友好的中文回答。`;
 
-            // 1. Kimi
-            try {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 15000);
-                const res = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + KIMI_API_KEY },
-                    body: JSON.stringify({ model: 'moonshot-v1-8k', messages: [{ role: 'user', content: fullMsg }], temperature: 0.7 }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeout);
-                if (!res.ok) throw new Error('Kimi API error');
-                const data = await res.json();
-                const reply = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
-                if (reply) return reply;
-            } catch (e) { console.warn('Kimi API 失败，尝试 Hugging Face'); }
-
-            // 2. Hugging Face
             const hfToken = localStorage.getItem('hf_token');
             if (hfToken) {
                 try {
@@ -1462,11 +1692,10 @@
                     if (data && data.generated_text) {
                         return data.generated_text.replace(fullMsg, '').trim() || '（AI 返回为空）';
                     }
-                } catch (e) { console.warn('Hugging Face 调用失败'); }
+                } catch (e) { console.warn('Hugging Face 调用失败', e); }
             }
 
-            // 3. 兜底
-            return '🌙 所有 AI 服务暂时不可用，请稍后再试。';
+            return '🌙 AI 服务暂时不可用，请稍后再试。';
         }
 
         // ============================================================
@@ -1550,7 +1779,7 @@
         }
 
         // ============================================================
-        // 成员列表（修复：5分钟窗口 + 30秒刷新 + 点击交互）
+        // 成员列表
         // ============================================================
         async function updateMemberList() {
             const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -1703,7 +1932,7 @@
         }
 
         // ============================================================
-        // 视频通话（修复：从成员列表直接发起，不再 prompt）
+        // 视频通话
         // ============================================================
         function startCallFromInput() {
             const target = prompt('📞 输入对方用户名：');
@@ -1827,6 +2056,35 @@
         // 启动
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
+            // 监听 Supabase Auth 状态变化（GitHub OAuth 回跳 / token 刷新 / 退出）
+            try {
+                db.auth.onAuthStateChange((event, session) => {
+                    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && session.user) {
+                        const uid = session.user.id;
+                        if (_oauthProcessedUserId !== uid) {
+                            // 用 setTimeout 把异步 Supabase 调用移出回调，避免 Supabase 内部锁死锁
+                            setTimeout(async () => {
+                                if (_oauthProcessedUserId === uid) return;
+                                try {
+                                    const ok = await handleOAuthCallback();
+                                    if (ok) {
+                                        document.getElementById('welcomePage').style.display = 'none';
+                                        document.getElementById('authPage').style.display = 'none';
+                                    }
+                                } catch (err) {
+                                    console.error('OAuth 处理异常', err);
+                                }
+                            }, 0);
+                        }
+                    }
+                    if (event === 'SIGNED_OUT') {
+                        _oauthProcessedUserId = null;
+                    }
+                });
+            } catch (e) {
+                console.warn('注册 onAuthStateChange 失败', e);
+            }
+
             autoLogin();
         });
     </script>
