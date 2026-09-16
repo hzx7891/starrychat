@@ -130,7 +130,7 @@
         .remember-row { display: flex; align-items: center; gap: 10px; margin: 6px 0 18px; color: var(--text-secondary); font-size: 0.9rem; cursor: pointer; }
         .remember-row input[type="checkbox"] { accent-color: var(--primary); width: 18px; height: 18px; cursor: pointer; }
 
-        /* ===== 新增：第三方登录分隔线 + OAuth 按钮 ===== */
+        /* ===== 第三方登录分隔线 + OAuth 按钮 ===== */
         .oauth-divider {
             display: flex; align-items: center; gap: 10px;
             margin: 20px 0 14px; color: var(--text-muted);
@@ -288,6 +288,65 @@
 
         .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border-color); border-top: 2px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
 
+        /* ============================================================
+           新增：OAuth 全屏加载遮罩
+           ============================================================ */
+        #oauthLoadingOverlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: oauthFadeIn 0.2s ease;
+        }
+        @keyframes oauthFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        #oauthLoadingOverlay .oauth-spinner {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        #oauthLoadingOverlay .oauth-spinner .dot {
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation: oauthDotBounce 1.2s ease-in-out infinite;
+        }
+        #oauthLoadingOverlay .oauth-spinner .dot:nth-child(1) {
+            background: var(--primary);
+            animation-delay: 0s;
+        }
+        #oauthLoadingOverlay .oauth-spinner .dot:nth-child(2) {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            animation-delay: 0.15s;
+        }
+        #oauthLoadingOverlay .oauth-spinner .dot:nth-child(3) {
+            background: var(--secondary);
+            animation-delay: 0.3s;
+        }
+        @keyframes oauthDotBounce {
+            0%, 80%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
+            40% { transform: translateY(-14px) scale(1.15); opacity: 1; }
+        }
+        #oauthLoadingOverlay .oauth-loading-text {
+            color: #f0f0f5;
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 0.02em;
+        }
+        #oauthLoadingOverlay .oauth-loading-sub {
+            color: #8a8aaa;
+            font-size: 0.8rem;
+        }
+
         /* ===== 响应式 ===== */
         @media (max-width: 768px) {
             #menuToggle { display: flex; align-items: center; justify-content: center; }
@@ -318,12 +377,25 @@
             .welcome-title { font-size: 1.8rem; }
             .typewriter-text { font-size: 1.1rem; }
             .auth-box .legal-text { font-size: 0.6rem; }
+            /* 新增：小屏下绑定按钮收窄 */
+            #bindGithubBtn { padding: 4px 10px !important; font-size: 0.7rem !important; }
         }
     </style>
 </head>
 <body>
 
     <button id="menuToggle" onclick="toggleSidebar()">☰</button>
+
+    <!-- 新增：OAuth 全屏加载遮罩 -->
+    <div id="oauthLoadingOverlay">
+        <div class="oauth-spinner">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+        </div>
+        <div class="oauth-loading-text">正在验证账号，请稍候…</div>
+        <div class="oauth-loading-sub">首次登录可能需要几秒钟</div>
+    </div>
 
     <!-- 欢迎页 -->
     <div id="welcomePage">
@@ -371,7 +443,7 @@
             <div class="switch" onclick="showRegister()">还没有账号？注册 →</div>
             <div id="loginError" class="error"></div>
 
-            <!-- 新增：第三方登录分隔线 + OAuth 按钮 -->
+            <!-- 第三方登录分隔线 + OAuth 按钮 -->
             <div class="oauth-divider"><span>或使用第三方账号</span></div>
             <button class="oauth-btn oauth-github" onclick="signInWithGitHub()" type="button">
                 <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -406,7 +478,7 @@
             <div class="switch" onclick="showLogin()">已有账号？返回登录</div>
             <div id="regError" class="error"></div>
 
-            <!-- 新增：第三方登录分隔线 + OAuth 按钮 -->
+            <!-- 第三方登录分隔线 + OAuth 按钮 -->
             <div class="oauth-divider"><span>或使用第三方账号</span></div>
             <button class="oauth-btn oauth-github" onclick="signInWithGitHub()" type="button">
                 <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -442,6 +514,8 @@
             </div>
             <div class="actions">
                 <img id="myAvatar" class="avatar avatar-sm" title="点击更换头像" onclick="uploadAvatar()" style="cursor:pointer;" />
+                <!-- 新增：绑定 GitHub 按钮 -->
+                <button id="bindGithubBtn" class="btn btn-secondary" style="padding:6px 16px;font-size:0.8rem;" onclick="startBindGithub()">🔗 绑定 GitHub</button>
                 <button id="soundToggle" class="icon-btn" onclick="toggleSound()" title="新消息提示音">🔔</button>
                 <button class="icon-btn" onclick="toggleTheme()" title="切换主题">🌓</button>
                 <button class="btn btn-secondary" onclick="logout()" style="padding:6px 16px;font-size:0.8rem;">退出</button>
@@ -529,12 +603,12 @@
         const SUPABASE_URL = 'https://nzgnqwcsgnqjffydnxtz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_igxAfIfC7M4n6SYJKkqQRA_Cj2V0ba9';
         const API_NINJAS_KEY = '10dxzeBAfkw8GU2FqFi7aPPpLbODvq5r5cANzCEV';
-        // 安全清理：已删除 Kimi API Key
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // ===== 全局状态 =====
-        let currentUser = { username: '', avatar: '', signature: '' };
+        // 修改：currentUser 增加 auth_id 字段
+        let currentUser = { username: '', avatar: '', signature: '', auth_id: null };
         let currentRoom = '大厅';
         let soundEnabled = true;
         let wsChannels = [];
@@ -544,8 +618,11 @@
         let callTarget = '';
         let isAdmin = false;
 
-        // 新增：OAuth 处理标记，防止同一用户重复处理
+        // OAuth 处理标记，防止同一用户重复处理
         let _oauthProcessedUserId = null;
+
+        // 新增：OAuth 加载遮罩的定时器句柄
+        let _oauthLoadingTimer = null;
 
         // 分页
         let currentPage = 0;
@@ -669,6 +746,33 @@
         }
 
         // ============================================================
+        // 新增：OAuth 加载遮罩控制
+        // ============================================================
+        function showOAuthLoading() {
+            const overlay = document.getElementById('oauthLoadingOverlay');
+            if (!overlay) return;
+            overlay.style.display = 'flex';
+            // 清除旧定时器，避免重叠
+            if (_oauthLoadingTimer) { clearTimeout(_oauthLoadingTimer); _oauthLoadingTimer = null; }
+            // 15 秒超时保护
+            _oauthLoadingTimer = setTimeout(() => {
+                overlay.style.display = 'none';
+                _oauthLoadingTimer = null;
+                alert('验证超时，请刷新页面重试');
+            }, 15000);
+        }
+
+        function hideOAuthLoading() {
+            const overlay = document.getElementById('oauthLoadingOverlay');
+            if (overlay) overlay.style.display = 'none';
+            if (_oauthLoadingTimer) { clearTimeout(_oauthLoadingTimer); _oauthLoadingTimer = null; }
+        }
+
+        // 供外部调试使用
+        window.showOAuthLoading = showOAuthLoading;
+        window.hideOAuthLoading = hideOAuthLoading;
+
+        // ============================================================
         // 欢迎页打字机
         // ============================================================
         const welcomeTexts = ['欢迎来到 StarryChat ✦', '连接每一颗星星', '开启你的聊天之旅', '✨ 星迹有你更精彩'];
@@ -727,7 +831,7 @@
         }
 
         // ============================================================
-        // 新增：GitHub OAuth 登录
+        // GitHub OAuth 登录
         // ============================================================
         function signInWithGitHub() {
             if (checkMaintenance()) return;
@@ -746,14 +850,51 @@
         }
         window.signInWithGitHub = signInWithGitHub;
 
-        // 新增：清理 URL 中的 access_token 哈希
+        // 新增：绑定 GitHub 点击处理
+        function startBindGithub() {
+            if (!currentUser.username) { alert('请先登录'); return; }
+            if (currentUser.auth_id) { alert('你已经绑定了 GitHub 账号'); return; }
+            if (!confirm('绑定后可以用 GitHub 一键登录，原密码依然有效。\n\n⚠️ 请确保你想绑定的 GitHub 账号是你自己的，绑定后不可随意更改。\n\n继续吗？')) return;
+            localStorage.setItem('starry_link_target', currentUser.username);
+            db.auth.signInWithOAuth({
+                provider: 'github',
+                options: {
+                    redirectTo: 'https://hzx7891.github.io/starrychat/',
+                    scopes: 'read:user user:email'
+                }
+            });
+        }
+        window.startBindGithub = startBindGithub;
+
+        // 新增：刷新顶部绑定按钮状态（以数据库为准）
+        async function refreshGithubBindStatus() {
+            if (!currentUser.username) return;
+            try {
+                const { data } = await db.from('users').select('auth_id').eq('username', currentUser.username).single();
+                currentUser.auth_id = (data && data.auth_id) || null;
+                const btn = document.getElementById('bindGithubBtn');
+                if (!btn) return;
+                if (currentUser.auth_id) {
+                    btn.textContent = '✓ GitHub 已绑定';
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                } else {
+                    btn.textContent = '🔗 绑定 GitHub';
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                }
+            } catch (_) {}
+        }
+        window.refreshGithubBindStatus = refreshGithubBindStatus;
+
+        // 清理 URL 中的 access_token 哈希
         function cleanOAuthHash() {
             if (window.location.hash && window.location.hash.includes('access_token')) {
                 window.history.replaceState({}, '', window.location.pathname + window.location.search);
             }
         }
 
-        // 新增：用户名净化（去掉空格与非法字符，限长 24）
+        // 用户名净化（去掉空格与非法字符，限长 24）
         function sanitizeOAuthUsername(raw) {
             let name = String(raw == null ? '' : raw);
             name = name.replace(/\s+/g, '');
@@ -763,136 +904,238 @@
             return name;
         }
 
-        // 新增：处理 OAuth 回跳，返回 true 表示已成功接管登录流程
+        // ============================================================
+        // 处理 OAuth 回跳
+        // 返回 true 表示已成功接管登录流程
+        // 修改：全流程 try/finally，保证遮罩一定 hide
+        // 修改：开头增加「绑定 GitHub」分支
+        // ============================================================
         async function handleOAuthCallback() {
-            // 1. 清理 URL 里的 access_token 哈希
-            cleanOAuthHash();
-
-            // 2. 拿 session
-            let session = null;
             try {
-                const res = await db.auth.getSession();
-                session = res && res.data ? res.data.session : null;
-            } catch (e) {
-                console.warn('获取 OAuth session 失败', e);
-            }
-            if (!session || !session.user) return false;
+                // 1. 清理 URL 里的 access_token 哈希
+                cleanOAuthHash();
 
-            const user = session.user;
-
-            // 防止重复处理同一个用户
-            if (_oauthProcessedUserId === user.id) return true;
-            _oauthProcessedUserId = user.id;
-
-            // 3. 查询 users 表是否已有 auth_id = session.user.id 的记录
-            let record = null;
-            try {
-                const { data } = await db.from('users').select('*').eq('auth_id', user.id).maybeSingle();
-                record = data || null;
-            } catch (e) {
-                console.warn('按 auth_id 查询用户失败', e);
-            }
-
-            // 4. 没有则创建新账号（🔒 安全策略：绝不自动绑定已有账号）
-            if (!record) {
-                const meta = user.user_metadata || {};
-                const rawName = meta.user_name || meta.preferred_username || meta.name ||
-                    (user.email ? String(user.email).split('@')[0] : '') || 'user';
-                const baseName = sanitizeOAuthUsername(rawName);
-
-                const placeholderHash = sha256('oauth_' + user.id + '_' + Date.now());
-                const avatarUrl = meta.avatar_url || '';
-
-                let finalName = null;
-
-                // 依次尝试 baseName, baseName_1, baseName_2 ...
-                // 🔒 安全策略：无论同名账号有没有绑过 OAuth，一律不自动绑定，直接换后缀
-                for (let i = 0; i <= 99; i++) {
-                    const tryName = (i === 0) ? baseName : (baseName + '_' + i);
-                    let existing = null;
-                    try {
-                        const { data } = await db.from('users')
-                            .select('username').eq('username', tryName).maybeSingle();
-                        existing = data || null;
-                    } catch (e) {
-                        console.warn('检查用户名失败', e);
-                    }
-                    if (!existing) { finalName = tryName; break; }
-                }
-                if (!finalName) finalName = baseName + '_' + Date.now().toString().slice(-4);
-
-                // 🔒 只创建新账号，绝不自动绑定已有账号（防止 OAuth 账号劫持）
+                // 2. 拿 session
+                let session = null;
                 try {
-                    await db.from('users').insert({
-                        username: finalName,
-                        password_hash: placeholderHash,
-                        avatar: avatarUrl,
-                        signature: '',
-                        is_banned: false,
-                        auth_id: user.id,
-                        oauth_provider: 'github',
-                        email: user.email || null
-                    });
+                    const res = await db.auth.getSession();
+                    session = res && res.data ? res.data.session : null;
                 } catch (e) {
-                    console.warn('创建 OAuth 用户失败', e);
+                    console.warn('获取 OAuth session 失败', e);
+                }
+                if (!session || !session.user) return false;
+
+                const user = session.user;
+
+                // ========================================================
+                // 新增：绑定分支（优先处理）
+                // ========================================================
+                const linkTarget = localStorage.getItem('starry_link_target');
+                if (linkTarget) {
+                    try {
+                        // a. 查目标账号
+                        let target = null;
+                        try {
+                            const { data } = await db.from('users').select('*').eq('username', linkTarget).maybeSingle();
+                            target = data || null;
+                        } catch (e) {
+                            console.warn('查目标账号失败', e);
+                        }
+
+                        // b. 目标账号不存在
+                        if (!target) {
+                            alert('绑定失败：目标账号不存在');
+                            localStorage.removeItem('starry_link_target');
+                            try { await db.auth.signOut(); } catch (_) {}
+                            _oauthProcessedUserId = null;
+                            return false;
+                        }
+
+                        // c. 目标账号已绑定其他 GitHub
+                        if (target.auth_id && target.auth_id !== user.id) {
+                            alert('绑定失败：该账号已绑定其他 GitHub 账号');
+                            localStorage.removeItem('starry_link_target');
+                            try { await db.auth.signOut(); } catch (_) {}
+                            _oauthProcessedUserId = null;
+                            return false;
+                        }
+
+                        // d. 清理同 auth_id 的其他账号（防止 UNIQUE 冲突，只解绑不删除）
+                        try {
+                            await db.from('users').update({ auth_id: null, oauth_provider: null })
+                                .eq('auth_id', user.id).neq('username', linkTarget);
+                        } catch (e) {
+                            console.warn('清理冲突账号失败', e);
+                        }
+
+                        // e. 绑定
+                        const { error: bindErr } = await db.from('users').update({
+                            auth_id: user.id,
+                            oauth_provider: 'github',
+                            email: user.email || null
+                        }).eq('username', linkTarget);
+                        if (bindErr) {
+                            alert('绑定失败：' + bindErr.message);
+                            localStorage.removeItem('starry_link_target');
+                            return false;
+                        }
+
+                        // f. 清掉标记
+                        localStorage.removeItem('starry_link_target');
+
+                        // g. 设置 currentUser
+                        currentUser = {
+                            username: target.username,
+                            avatar: target.avatar || '',
+                            signature: target.signature || '',
+                            auth_id: user.id
+                        };
+
+                        // h. 管理员标记
+                        isAdmin = currentUser.username === 'hzx7891';
+
+                        // i. 保留 localStorage 的 starry_remember（不清）
+
+                        // 标记已处理该 OAuth 用户
+                        _oauthProcessedUserId = user.id;
+
+                        // j. 提示成功
+                        alert('✅ 绑定成功！以后可以用 GitHub 一键登录');
+
+                        // k. 进入聊天室
+                        enterChat();
+
+                        // l. 返回 true
+                        return true;
+                    } catch (e) {
+                        console.warn('绑定流程异常', e);
+                        alert('绑定失败：' + (e && e.message ? e.message : e));
+                        localStorage.removeItem('starry_link_target');
+                        return false;
+                    }
                 }
 
-                // 重新读取记录
+                // ========================================================
+                // 普通登录/创建流程
+                // ========================================================
+                // 防止重复处理同一个用户
+                if (_oauthProcessedUserId === user.id) return true;
+                _oauthProcessedUserId = user.id;
+
+                // 3. 查询 users 表是否已有 auth_id = session.user.id 的记录
+                let record = null;
                 try {
                     const { data } = await db.from('users').select('*').eq('auth_id', user.id).maybeSingle();
                     record = data || null;
                 } catch (e) {
-                    console.warn('重新读取 OAuth 用户失败', e);
+                    console.warn('按 auth_id 查询用户失败', e);
                 }
+
+                // 4. 没有则创建新账号（🔒 安全策略：绝不自动绑定已有账号）
                 if (!record) {
-                    record = {
-                        username: finalName,
-                        avatar: avatarUrl,
-                        signature: '',
-                        is_banned: false
-                    };
+                    const meta = user.user_metadata || {};
+                    const rawName = meta.user_name || meta.preferred_username || meta.name ||
+                        (user.email ? String(user.email).split('@')[0] : '') || 'user';
+                    const baseName = sanitizeOAuthUsername(rawName);
+
+                    const placeholderHash = sha256('oauth_' + user.id + '_' + Date.now());
+                    const avatarUrl = meta.avatar_url || '';
+
+                    let finalName = null;
+
+                    // 依次尝试 baseName, baseName_1, baseName_2 ...
+                    // 🔒 无论同名账号有没有绑过 OAuth，一律不自动绑定，直接换后缀
+                    for (let i = 0; i <= 99; i++) {
+                        const tryName = (i === 0) ? baseName : (baseName + '_' + i);
+                        let existing = null;
+                        try {
+                            const { data } = await db.from('users')
+                                .select('username').eq('username', tryName).maybeSingle();
+                            existing = data || null;
+                        } catch (e) {
+                            console.warn('检查用户名失败', e);
+                        }
+                        if (!existing) { finalName = tryName; break; }
+                    }
+                    if (!finalName) finalName = baseName + '_' + Date.now().toString().slice(-4);
+
+                    // 🔒 只创建新账号，绝不自动绑定已有账号（防止 OAuth 账号劫持）
+                    try {
+                        await db.from('users').insert({
+                            username: finalName,
+                            password_hash: placeholderHash,
+                            avatar: avatarUrl,
+                            signature: '',
+                            is_banned: false,
+                            auth_id: user.id,
+                            oauth_provider: 'github',
+                            email: user.email || null
+                        });
+                    } catch (e) {
+                        console.warn('创建 OAuth 用户失败', e);
+                    }
+
+                    // 重新读取记录
+                    try {
+                        const { data } = await db.from('users').select('*').eq('auth_id', user.id).maybeSingle();
+                        record = data || null;
+                    } catch (e) {
+                        console.warn('重新读取 OAuth 用户失败', e);
+                    }
+                    if (!record) {
+                        record = {
+                            username: finalName,
+                            avatar: avatarUrl,
+                            signature: '',
+                            is_banned: false
+                        };
+                    }
                 }
-            }
 
-            // 5. 封禁检查
-            if (record.is_banned) {
-                alert('⛔ 账号已被封禁：' + (record.ban_reason || '违规操作'));
-                try { await db.auth.signOut(); } catch (_) {}
-                _oauthProcessedUserId = null;
-                return false;
-            }
+                // 5. 封禁检查
+                if (record.is_banned) {
+                    alert('⛔ 账号已被封禁：' + (record.ban_reason || '违规操作'));
+                    try { await db.auth.signOut(); } catch (_) {}
+                    _oauthProcessedUserId = null;
+                    return false;
+                }
 
-            // 6. 设置 currentUser
-            currentUser = {
-                username: record.username,
-                avatar: record.avatar || '',
-                signature: record.signature || ''
-            };
-            isAdmin = currentUser.username === 'hzx7891';
+                // 6. 设置 currentUser
+                currentUser = {
+                    username: record.username,
+                    avatar: record.avatar || '',
+                    signature: record.signature || '',
+                    auth_id: user.id
+                };
+                isAdmin = currentUser.username === 'hzx7891';
 
-            // 更新登录日志（与密码登录保持一致，写入 login_logs）
-            try {
-                const deviceInfo = navigator.userAgent || '未知设备';
-                await db.from('login_logs').insert({
-                    username: currentUser.username,
-                    device: deviceInfo,
-                    created_at: new Date().toISOString()
-                });
-                await db.from('users').update({
-                    last_login_at: new Date().toISOString(),
-                    last_device: deviceInfo
-                }).eq('username', currentUser.username);
-            } catch (_) {}
+                // 更新登录日志（与密码登录保持一致，写入 login_logs）
+                try {
+                    const deviceInfo = navigator.userAgent || '未知设备';
+                    await db.from('login_logs').insert({
+                        username: currentUser.username,
+                        device: deviceInfo,
+                        created_at: new Date().toISOString()
+                    });
+                    await db.from('users').update({
+                        last_login_at: new Date().toISOString(),
+                        last_device: deviceInfo
+                    }).eq('username', currentUser.username);
+                } catch (_) {}
 
-            // 7. 签名为空则强制进入签名设置页
-            if (!currentUser.signature) {
-                showSignaturePage();
+                // 7. 签名为空则强制进入签名设置页
+                if (!currentUser.signature) {
+                    showSignaturePage();
+                    return true;
+                }
+
+                // 8. 否则直接进入聊天室
+                enterChat();
                 return true;
+            } finally {
+                // 修改：无论从哪条路径返回，都确保遮罩被隐藏
+                hideOAuthLoading();
             }
-
-            // 8. 否则直接进入聊天室
-            enterChat();
-            return true;
         }
 
         // ============================================================
@@ -927,7 +1170,7 @@
         async function saveSignatureAndEnter() {
             const sig = document.getElementById('signatureInput').value.trim();
 
-            // 新增：签名为空不允许跳过
+            // 签名为空不允许跳过
             if (!sig) { alert('请填写个性签名～'); return; }
 
             if (currentUser.username) {
@@ -973,7 +1216,7 @@
         }
 
         // ============================================================
-        // 登录 / 注册（带 loading 动画）
+        // 登录 / 注册
         // ============================================================
         function showRegister() { document.getElementById('loginBox').style.display = 'none'; document.getElementById('regBox').style.display = 'block'; }
         function showLogin() { document.getElementById('regBox').style.display = 'none'; document.getElementById('loginBox').style.display = 'block'; }
@@ -998,14 +1241,14 @@
 
             try {
                 const { data, error } = await db.from('users')
-                    .select('username, avatar, signature, password_hash, is_banned, ban_reason')
+                    .select('username, avatar, signature, password_hash, is_banned, ban_reason, auth_id')
                     .eq('username', u).single();
 
                 if (error || !data) { errEl.innerText = '用户名或密码错误'; return; }
                 if (data.is_banned) { errEl.innerText = '账号已被封禁：' + (data.ban_reason || '违规操作'); return; }
                 if (!verifyPassword(p, data.password_hash)) { errEl.innerText = '用户名或密码错误'; return; }
 
-                currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '' };
+                currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '', auth_id: data.auth_id || null };
                 isAdmin = data.username === 'hzx7891';
 
                 // 记录日志
@@ -1080,7 +1323,10 @@
             }
         }
 
-        // ===== 自动登录：优先 OAuth session，其次 remember_token =====
+        // ============================================================
+        // 自动登录：优先 OAuth session，其次 remember_token
+        // 修改：检测到 OAuth session 时显示加载遮罩
+        // ============================================================
         async function autoLogin() {
             if (checkMaintenance()) {
                 document.getElementById('welcomePage').style.display = 'flex';
@@ -1088,15 +1334,18 @@
                 return;
             }
 
-            // 新增：先检查 OAuth session
+            // 先检查 OAuth session
             try {
                 const { data } = await db.auth.getSession();
                 if (data && data.session && data.session.user) {
+                    // 新增：显示加载遮罩（handleOAuthCallback 的 finally 会 hide）
+                    showOAuthLoading();
                     const ok = await handleOAuthCallback();
                     if (ok) return;
                 }
             } catch (e) {
                 console.warn('检查 OAuth 会话失败', e);
+                hideOAuthLoading();
             }
 
             // 原逻辑：检查 localStorage 里的 starry_remember token
@@ -1104,7 +1353,7 @@
             if (savedToken) {
                 try {
                     const { data, error } = await db.from('users')
-                        .select('username, avatar, signature, remember_expires, remember_device, is_banned')
+                        .select('username, avatar, signature, remember_expires, remember_device, is_banned, auth_id')
                         .eq('remember_token', savedToken).single();
                     if (data && !error && data.remember_expires && new Date(data.remember_expires).getTime() > Date.now()) {
                         const savedDevice = localStorage.getItem('starry_device');
@@ -1123,7 +1372,7 @@
                             runTypeWriter();
                             return;
                         }
-                        currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '' };
+                        currentUser = { username: data.username, avatar: data.avatar || '', signature: data.signature || '', auth_id: data.auth_id || null };
                         isAdmin = data.username === 'hzx7891';
                         if (!currentUser.signature && !currentUser.avatar) { showSignaturePage(); return; }
                         enterChat();
@@ -1139,6 +1388,7 @@
 
         // ============================================================
         // 进入聊天
+        // 修改：新增调用 refreshGithubBindStatus()
         // ============================================================
         function enterChat() {
             document.getElementById('authPage').style.display = 'none';
@@ -1148,6 +1398,9 @@
 
             const avatarUrl = getAvatarUrl(currentUser.username, currentUser.avatar);
             document.getElementById('myAvatar').src = avatarUrl;
+
+            // 新增：刷新绑定按钮状态
+            refreshGithubBindStatus();
 
             const roomFromURL = detectRoomFromURL();
             const targetRoom = roomFromURL || '大厅';
@@ -1271,6 +1524,7 @@
             memberRefreshInterval = setInterval(() => { updateMemberList(); }, 30000);
         }
 
+        // 修改：logout 增加清 starry_link_target、hideOAuthLoading、重置 currentUser.auth_id
         function logout() {
             stopBanMonitoring();
             stopMaintenanceMonitoring();
@@ -1278,15 +1532,21 @@
             if (globalChannel) { try { db.removeChannel(globalChannel); } catch (_) {} globalChannel = null; }
             if (roomSubscription) { try { db.removeChannel(roomSubscription); } catch (_) {} roomSubscription = null; }
             hangUp();
-            currentUser = { username: '', avatar: '', signature: '' };
+            currentUser = { username: '', avatar: '', signature: '', auth_id: null };
             isAdmin = false;
 
-            // 新增：退出 Supabase OAuth 会话 + 重置 OAuth 处理标记
+            // 退出 Supabase OAuth 会话 + 重置 OAuth 处理标记
             try { db.auth.signOut(); } catch (_) {}
             _oauthProcessedUserId = null;
 
             localStorage.removeItem('starry_remember');
             localStorage.removeItem('starry_device');
+            // 新增：清掉绑定流程标记，避免下次 GitHub 登录被误判为绑定
+            localStorage.removeItem('starry_link_target');
+
+            // 新增：隐藏可能的加载遮罩
+            hideOAuthLoading();
+
             document.getElementById('chatApp').style.display = 'none';
             document.getElementById('authPage').style.display = 'flex';
             wsChannels.forEach(ch => { try { db.removeChannel(ch); } catch (_) {} });
@@ -1669,7 +1929,7 @@
         }
 
         // ============================================================
-        // AI 集成（安全清理：已移除 Kimi，仅保留 Hugging Face + 兜底）
+        // AI 集成（仅保留 Hugging Face + 兜底）
         // ============================================================
         async function askAI(prompt, context) {
             const truncatedContext = context ? context.substring(0, 1000) : '';
@@ -2054,9 +2314,10 @@
 
         // ============================================================
         // 启动
+        // 修改：onAuthStateChange 里显示/隐藏加载遮罩，try/catch 包裹
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
-            // 监听 Supabase Auth 状态变化（GitHub OAuth 回跳 / token 刷新 / 退出）
+            // 监听 Supabase Auth 状态变化
             try {
                 db.auth.onAuthStateChange((event, session) => {
                     if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && session.user) {
@@ -2065,6 +2326,8 @@
                             // 用 setTimeout 把异步 Supabase 调用移出回调，避免 Supabase 内部锁死锁
                             setTimeout(async () => {
                                 if (_oauthProcessedUserId === uid) return;
+                                // 新增：显示加载遮罩（handleOAuthCallback 的 finally 会 hide）
+                                showOAuthLoading();
                                 try {
                                     const ok = await handleOAuthCallback();
                                     if (ok) {
@@ -2074,11 +2337,15 @@
                                 } catch (err) {
                                     console.error('OAuth 处理异常', err);
                                 }
+                                // 保险再 hide 一次
+                                hideOAuthLoading();
                             }, 0);
                         }
                     }
                     if (event === 'SIGNED_OUT') {
                         _oauthProcessedUserId = null;
+                        // 新增：退出时隐藏遮罩
+                        hideOAuthLoading();
                     }
                 });
             } catch (e) {
